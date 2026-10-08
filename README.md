@@ -81,7 +81,7 @@ The background service is intended to carry on when the browser is closed. It wi
 
 The first milestone is **read-only**. Later, the organiser will use a transaction journal, collision checks and explicit per-folder permissions before making authorised changes. Existing metadata and human corrections should survive a fresh scan. Originals will not be automatically deleted or overwritten.
 
-A fast guessed match is still a guess. The organiser should be able to say *I don't know* and leave the file alone, which is considerably more useful than quietly filing the wrong film under a plausible title.
+A fast guessed match is still a guess. An uncertain result belongs in the review queue, not quietly filed under a plausible but incorrect title.
 
 For the full design, see [product specification](docs/product-spec.md) and [security and safety](docs/security-and-safety.md).
 
@@ -95,7 +95,7 @@ AI is optional by design. A local model, Claude or ChatGPT could help review amb
 
 The eventual deployment target is a local web service, initially on **Linux or Docker**, with a browser-based interface bound to localhost by default. Windows and macOS packaging can follow after the file-handling core has been tested across platforms.
 
-There will be selectable **Quiet**, **Balanced** and **Fast when idle** profiles. These are design targets until actual benchmarks exist: we're not going to publish invented CPU figures or promise that network storage behaves like a local SSD.
+There will be selectable **Quiet**, **Balanced** and **Fast when idle** profiles. These remain design targets until there are actual benchmarks; network storage rarely behaves as conveniently as a local SSD.
 
 **There are no installation commands yet.** Don't clone this repository expecting a runnable application at this stage. The [roadmap](docs/roadmap.md) sets out the first working milestone: setup wizard, read-only scanner, SQLite catalogue, job controls and a useful report of proposed changes.
 
@@ -103,6 +103,6 @@ There will be selectable **Quiet**, **Balanced** and **Fast when idle** profiles
 
 This project is being developed under **TABARC-Code**. The immediate work is the filesystem inventory and matching groundwork, not an elaborate AI control panel. The latter is worth doing, but only after the application understands what it's looking at.
 
-See [description.md](description.md) for the longer project brief and design reasoning, [CLAUDE.md](CLAUDE.md) for coding conventions and [the roadmap](docs/roadmap.md) for the staged build. Development notes and code comments use UK English and should explain the actual decisions, limitations and odd cases encountered along the way.
+See [description.md](description.md) for the longer project brief and design reasoning, and [the roadmap](docs/roadmap.md) for the staged build. Development notes and code comments use UK English and explain actual decisions, limitations and odd cases encountered along the way.
 
 Contributions, issue reports and corrections are welcome once there is something concrete to run or review. A licence still needs to be chosen; until then, don't assume the repository is released under an open-source licence simply because it is public.
