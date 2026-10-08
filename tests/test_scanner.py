@@ -64,5 +64,5 @@ def test_pause_resume_and_no_pruning_mid_scan(tmp_path):
     resumed = scanner.start(lib, resume_id=job)
     assert resumed == job
     assert wait_for(store, job, {"completed", "failed"}) == "completed"
-    assert len(store.files(lib)) == 280
+    assert len(store.files(lib, limit=500)) == 280
     scanner.shutdown()
