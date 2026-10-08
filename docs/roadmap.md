@@ -8,12 +8,12 @@ Status: proposal; passing criteria are mandatory.
 - Select an open-source licence before accepting contributed code.
 - Reuse *ideas* from uploaded reference tools, not code without compatible licences.
 
-## Milestone 1 — usable read-only MVP
+## Milestone 1 — usable read-only MVP (in progress)
 
-- Python 3.12+, FastAPI and lightweight accessible local web UI; SQLite on local storage with migrations.
+- Python 3.11+, FastAPI and lightweight local web UI; SQLite on local storage with the initial schema and a basic migration. Implemented as an alpha; accessibility still needs review.
 - Setup wizard: multiple media/app selections, library root picker, safe operation mode, scanning intensity.
 - Read-only filesystem inventory with ignore rules, resumable progress, pause/resume and rate limiting.
-- ffprobe/ExifTool optional adapters with graceful absence handling; no transcode and no full-file hashes by default.
+- ffprobe/ExifTool optional adapters with graceful absence handling (not implemented yet); no transcode and no full-file hashes by default.
 - Dashboard: total files, type breakdown, unmapped files, recent scans, errors and saved settings.
 - **Exit:** tested against fixture libraries, no changed media files, low-resource scan, restart-safe jobs.
 
