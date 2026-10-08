@@ -1,8 +1,10 @@
-# Claude Code instructions — TABARC Media Organiser
+# TABARC Media Organiser — source conventions
 
 You are developing a local-first, safe-by-default media library organiser, not a downloader and not a media server replacement.
 
-**Read before work:** `README.md`, `docs/product-spec.md`, `docs/security-and-safety.md`, `docs/roadmap.md`.
+**Read before work:** `README.md`, `description.md`, `docs/product-spec.md`, `docs/security-and-safety.md`, `docs/roadmap.md`.
+
+Project-facing documentation must describe the software and its intended users, not its authoring process. Do not mention assistants, model names or automated generation as contributors to the project. AI and MCP may be discussed where they are optional capabilities users can connect to the finished application.
 
 ## Rules
 
@@ -40,7 +42,7 @@ Use natural sentence length and paragraph rhythm. Longer explanations are fine w
 
 A restrained dry observation is fine once in a while, particularly when it describes a genuine technical absurdity. Don't turn code comments into stand-up material or force a percentage of jokes. Prefer candid notes about known limitations to invented personality.
 
-First person can be used when it genuinely expresses an implementation decision, but don't fill every function with "I've done this". Tell the reader what matters: why a guard exists, what a library assumes, how state is recovered, and which cases still need testing. If it's speculative, label it as speculative.
+Keep public project descriptions in the project's own voice, without first-person claims about who wrote them. In source comments, first person is acceptable only when it clarifies a genuine engineering decision; don't fill every function with "I've done this". Explain why a guard exists, what a library assumes, how state is recovered and which cases still need testing. Mark speculation clearly.
 
 **Useful examples:**
 
