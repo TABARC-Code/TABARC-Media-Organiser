@@ -16,7 +16,7 @@ The library is an **index and organiser**, not a downloader, media player or new
 4. Select naming profile, language, country/region, episode-order preference (aired/DVD/absolute), and metadata providers in priority order per media type.
 5. Configure provider API keys with a test connection button. Providers without a required key must work without one. Store credentials through a secret manager, not ordinary settings JSON.
 6. Select resource profile (Quiet / Balanced / Fast when idle) and automation policy (Review every change / Verified simple renames / Verified operations inside managed roots). Deletion stays disabled.
-7. Optionally enable AI: none; local model through a tool-calling adapter; Claude Code/Claude Desktop MCP; ChatGPT via supported custom MCP connector/tunnel; OpenAI/Anthropic API. Disclose external transmission before enabling.
+7. Optionally enable AI: none; local model through a tool-calling adapter; Claude or other compatible MCP clients; ChatGPT via supported custom MCP connection/tunnel; OpenAI/Anthropic API. Disclose external transmission before enabling.
 8. Run a read-only preview. Show files discovered, unknown titles, possible matches, potential conflicts and proposed changes before enabling automation.
 
 ## Main screen
