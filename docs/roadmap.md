@@ -4,7 +4,7 @@ Status: proposal; passing criteria are mandatory.
 
 ## Milestone 0 — repo and design
 
-- Project brief, architecture/security docs, CLAUDE.md, developer environment, tests and CI.
+- Project brief, architecture and security documentation, coding conventions, developer environment, tests and CI.
 - Select an open-source licence before accepting contributed code.
 - Reuse *ideas* from uploaded reference tools, not code without compatible licences.
 
