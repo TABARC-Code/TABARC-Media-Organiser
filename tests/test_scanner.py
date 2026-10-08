@@ -66,3 +66,18 @@ def test_pause_resume_and_no_pruning_mid_scan(tmp_path):
     assert wait_for(store, job, {"completed", "failed"}) == "completed"
     assert len(store.files(lib, limit=500)) == 280
     scanner.shutdown()
+
+
+def test_selected_media_types_filter_unrelated_files(tmp_path):
+    root = tmp_path / "books"
+    root.mkdir()
+    (root / "novel.epub").write_bytes(b"book")
+    (root / "movie.mkv").write_bytes(b"video")
+    (root / "book.opf").write_text("local metadata")
+    store = Catalogue(tmp_path / "state")
+    lib = store.add_library("Ebooks", root, ["ebooks"], ["calibre"])
+    scanner = Scanner(store)
+    job = scanner.start(lib)
+    assert wait_for(store, job, {"completed", "failed"}) == "completed"
+    assert {f["relative_path"] for f in store.files(lib)} == {"novel.epub", "book.opf"}
+    scanner.shutdown()
