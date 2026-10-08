@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -80,12 +80,12 @@ def create_app(data_dir: Path | None = None):
     async def local_write_protection(request: Request, call_next):
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             if request.headers.get("x-tabarc-local") != "1":
-                raise HTTPException(403, "Local action header required.")
+                return JSONResponse(status_code=403, content={"detail": "Local action header required."})
             origin = request.headers.get("origin")
             if origin:
                 parsed = urlsplit(origin)
                 if parsed.scheme not in {"http", "https"} or parsed.netloc != request.headers.get("host"):
-                    raise HTTPException(403, "Unexpected request origin.")
+                    return JSONResponse(status_code=403, content={"detail": "Unexpected request origin."})
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -112,7 +112,7 @@ def create_app(data_dir: Path | None = None):
         return store.libraries()
 
     @app.post("/api/libraries", status_code=201)
-    def add_library(payload: LibraryInput, x_tabarc_local: str | None = Header(None)):
+    def add_library(payload: LibraryInput):
         try:
             lib_id = store.add_library(payload.name, Path(payload.root),
                                        payload.media_types, payload.applications,
