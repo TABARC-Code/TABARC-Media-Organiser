@@ -8,7 +8,7 @@ Sorting media folders isn't particularly difficult work. It's repetitive, fussy 
 
 The application isn't being designed as a new media server. Plex, Jellyfin, Emby, Calibre, Audiobookshelf, Kavita, Komga and Navidrome already handle their own areas well enough. This sits alongside them, maintaining the files and portable metadata on which those applications rely. People using no media server at all should still be able to catalogue ordinary folders.
 
-**Current position:** the software is at the specification stage. There isn't a finished local service or supported release yet, and the code's eventual behaviour will need to be tested before it can be described as working.
+**Current position:** an initial read-only alpha now has a local web dashboard, SQLite catalogue and incremental scanner. There isn't a supported general release yet. Provider matching, server integrations, file renaming and metadata generation remain unimplemented, and the prototype still needs testing on real media servers and large collections.
 
 ## A deliberately straightforward interface
 
@@ -46,7 +46,7 @@ Quiet, Balanced and Fast-when-idle profiles should give people meaningful contro
 
 ## Trust has to be earned
 
-The first working milestone will scan and report **without changing a media file**. Later write-capable releases need scoped permissions per library, previews, identity checks, collision detection and a transaction journal. A rename should be recoverable where the filesystem permits it; a cross-filesystem transfer needs a different, more careful procedure. Automatic deletion is out.
+The current prototype scans and reports **without changing a media file**. Later write-capable releases need scoped permissions per library, previews, identity checks, collision detection and a transaction journal. A rename should be recoverable where the filesystem permits it; a cross-filesystem transfer needs a different, more careful procedure. Automatic deletion is out.
 
 An existing NFO or user-corrected title must not be casually replaced by whatever an online provider returns that afternoon. Secrets such as API credentials also need proper storage, not a cosmetic layer of encryption wrapped around a key sitting in the same settings file. LAN access and remote MCP connections should be opt-in, with clear permission boundaries.
 
@@ -62,7 +62,7 @@ Neither type of model should have unrestricted filesystem access. The applicatio
 
 ## Development approach
 
-The first release target is Linux/Docker with a local web GUI, SQLite catalogue, incremental read-only scanner, basic file inspection, job controls and a change report. Matching, validated renaming, portable metadata export and consumer integrations follow in separate stages. More media formats, duplicate analysis and optional AI support come once the fundamentals hold up under real tests.
+The initial Linux Python prototype contains a local web GUI, SQLite catalogue, incremental read-only scanner, basic filesystem inspection, job controls and a change report. Docker packaging is still planned. Matching, validated renaming, portable metadata export and consumer integrations follow in separate stages. More media formats, duplicate analysis and optional AI support come once the fundamentals hold up under real tests.
 
 The codebase should be modular without being needlessly elaborate. Media-specific handlers, provider adapters and the file-operation engine each have distinct responsibilities. Tests need to cover the unpleasant cases early: bad filenames, false matches, odd Unicode, broken network mounts, interrupted transfers, duplicate target names and incomplete metadata. Those aren't theoretical edge cases in a real media collection; they're Tuesday.
 
