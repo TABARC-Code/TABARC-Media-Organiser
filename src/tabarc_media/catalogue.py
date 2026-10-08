@@ -37,6 +37,7 @@ class Catalogue:
         self.db_path = self.directory / "catalogue.sqlite3"
         self.write_lock = threading.RLock()
         with self.connect() as db:
+            db.execute("PRAGMA journal_mode=WAL")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS libraries (
                     id INTEGER PRIMARY KEY, name TEXT NOT NULL,
@@ -68,7 +69,6 @@ class Catalogue:
                 row["name"] for row in db.execute("PRAGMA table_info(libraries)")
             }:
                 db.execute("ALTER TABLE libraries ADD COLUMN scan_profile TEXT NOT NULL DEFAULT 'balanced'")
-            db.execute("PRAGMA journal_mode=WAL")
             # A process can disappear mid-scan. The next start can resume safely
             # by rescanning; untouched files remain in the catalogue.
             db.execute("UPDATE jobs SET state='paused', message='Interrupted on restart' WHERE state='running'")
