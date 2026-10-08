@@ -43,7 +43,7 @@ def test_invalid_and_overlapping_roots(tmp_path):
     with pytest.raises(ValueError, match="Overlapping"):
         store.add_library("B", subdir, ["films"], [])
     with pytest.raises(ValueError, match="profile"):
-        store.add_library("C", tmp_path, ["films"], [], "ultra")
+        store.add_library("C", subdir, ["films"], [], "ultra")
     with pytest.raises(ValueError, match="catalogue directory"):
         store.add_library("D", tmp_path, ["films"], [])
     with pytest.raises(ValueError, match="media type"):
