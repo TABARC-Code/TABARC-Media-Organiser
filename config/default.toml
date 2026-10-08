@@ -1,0 +1,43 @@
+# TABARC Media Organiser: default configuration.
+#
+# Copy this to ~/.config/tabarc-media/config.toml and edit there.
+# Never put API keys in this file. Unknown keys are rejected, so a typo
+# fails loudly instead of being ignored.
+
+[database]
+# Must be on local disk. Not on the NAS, not inside a library root.
+path = "~/.local/share/tabarc-media/catalogue.sqlite3"
+
+[libraries]
+# Absolute paths to media roots, e.g. ["/mnt/nas/Movies", "/mnt/nas/TV"].
+# Roots must not overlap.
+roots = []
+
+[inventory]
+# Folder names skipped at any depth. Case-insensitive.
+exclude_dirs = [
+    "_review",
+    ".Trash", ".Trashes", "$RECYCLE.BIN", "System Volume Information", "lost+found",
+    "@eaDir", "#recycle", "#snapshot",
+    "@Recycle", "@Recently-Snapshot",
+    ".snapshot", ".snapshots", ".AppleDouble",
+]
+
+# Files recorded as media.
+media_extensions = [
+    ".mkv", ".mp4", ".avi", ".m4v", ".mov", ".ts", ".m2ts", ".webm", ".wmv", ".mpg", ".mpeg",
+    ".epub", ".pdf", ".mobi", ".azw3",
+    ".mp3", ".flac", ".m4a",
+    ".cbz", ".cbr",
+]
+
+# Files recorded as sidecars (subtitles, NFO, artwork). Linking them to
+# their main file comes in a later stage.
+sidecar_extensions = [
+    ".nfo", ".srt", ".ass", ".ssa", ".sub", ".idx", ".vtt", ".opf",
+    ".jpg", ".jpeg", ".png", ".webp",
+]
+
+# Run ffprobe on video files. Unchanged files are not probed twice.
+probe_video = true
+probe_timeout_seconds = 30

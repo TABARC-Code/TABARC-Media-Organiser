@@ -1,38 +1,119 @@
 # TABARC Media Organiser
 
-A local-first, low-resource media library organiser with a browser-based interface and optional AI integrations.
+Author: TABARC-Code
 
-**Status:** Planning and foundation stage. No working media scanner or rename engine has been released yet.
+A self-hosted catalogue for a media library that's grown faster than anyone's patience for naming things properly. Films, TV and ebooks first. Plex and Jellyfin get to read the results; they don't get to own them.
 
-## Purpose
+Right now it does one thing: it looks. It walks your library, records what's there, and asks ffprobe what each video actually is. It doesn't rename, move, tag or delete anything. That's deliberate. The renaming comes later, once there's a catalogue worth trusting and a plan you can read before anything happens.
 
-Organise existing personal media libraries without making users manually rename every file or create every metadata record. Target types include films, television, anime, ebooks, audiobooks, music, comics and photographs. Designed to work alongside Plex, Jellyfin, Emby, Calibre, Audiobookshelf, Kavita, Komga and Navidrome, with independent folder-only operation.
+## Status
 
-## Principles
+Stage 1 of six. Read-only inventory only.
 
-- **Useful without AI:** scanning, matching via configured reference databases, metadata generation and file operations must work deterministically.
-- **Local-first:** the server, catalogue and all file operations run on the user's machine.
-- **Quiet by default:** incremental scans, one low-priority worker, bounded I/O and backoff during system activity.
-- **Preview before trust:** begin read-only; introduce narrowly scoped, verified automatic changes only after user opt-in.
-- **No destructive automation:** don't delete or overwrite original media automatically.
-- **Multiple consumers:** more than one media application may use the same storage root; use app-specific output profiles.
-- **Optional AI:** an MCP tool interface plus adapters for cloud or local models, each restricted to approved operations.
-- **Portable records:** store provenance, stable identifiers, file relationships, sidecars and history in a local catalogue.
+| Stage | What | State |
+|---|---|---|
+| 1 | Read-only inventory | Done |
+| 2 | Identity: TMDB, filename parsing, review queue | Next |
+| 3 | Dry-run plans, transaction journal, rollback | Planned |
+| 4 | NFO and reference files | Planned |
+| 5 | Ebooks, Calibre, Dewey (verified or blank) | Planned |
+| 6 | Reports and exports | Planned |
 
-## First milestone
+## Requirements
 
-A usable localhost setup wizard, media/app selection, root-folder configuration, SQLite catalogue, read-only incremental scanner, job progress and a proposed-change report. The first milestone **must not rename, move, delete or modify media files**.
+- Python 3.12 or newer
+- ffprobe (part of FFmpeg), optional but you'll want it. Without it the scan still runs, it just can't tell you anything about the video streams.
+- Linux is what it's tested on. macOS should work but the network-filesystem check won't run there.
 
-See [product specification](docs/product-spec.md), [security and safety model](docs/security-and-safety.md) and [delivery plan](docs/roadmap.md) as development progresses.
+No Python packages needed at runtime. Honestly, it's standard library all the way down for now.
 
-## Development
+## Install
 
-The project uses UK English for documentation and messages. Claude Code and other coding agents should read `CLAUDE.md` before making changes. Do not claim that integration tests, metadata lookups or real filesystem operations have been validated unless they actually ran.
+```bash
+git clone <repo-url> tabarc-media-organiser
+cd tabarc-media-organiser
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e '.[test]'
+```
 
-## Licence and external metadata
+## Configure
 
-A project licence has not yet been selected. External metadata services have different rate limits, attribution requirements and API access terms. Keep provider adapters independent and never ship other people's API keys or proprietary classification schedules.
+```bash
+mkdir -p ~/.config/tabarc-media
+cp config/default.toml ~/.config/tabarc-media/config.toml
+```
 
-## Repository
+Then edit the copy. At minimum, set your roots:
 
-[TABARC-Code/TABARC-Media-Organiser](https://github.com/TABARC-Code/TABARC-Media-Organiser)
+```toml
+[libraries]
+roots = ["/mnt/nas/Movies", "/mnt/nas/TV", "/mnt/nas/Books"]
+```
+
+Things the loader will refuse, on purpose:
+
+- relative paths
+- the same root twice, or one root inside another (you'd get every file twice)
+- the database inside a library root
+- any key it doesn't recognise, so `media_extension` instead of `media_extensions` fails loudly instead of being quietly ignored
+
+**Keep the database on local disk.** SQLite over SMB or NFS is a known way to corrupt it. On Linux the tool checks the mount table and won't open a catalogue on cifs, nfs and friends. On other systems it can't check, so that one's on you.
+
+## Run
+
+```bash
+tabarc-media inventory              # scan, with ffprobe
+tabarc-media inventory --no-probe   # quick first pass, no ffprobe
+tabarc-media issues                 # what went wrong in the last scan
+tabarc-media issues --scan 4        # ...or a specific one
+```
+
+The first full scan of a big NAS will take a while, mostly ffprobe. Later scans only probe files whose size or modified time changed, so they're much quicker. If you stop a scan with Ctrl-C, nothing's lost. Run it again and it picks up the expensive work where it left off.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Complete, no issues |
+| 2 | Config or catalogue problem, nothing scanned |
+| 3 | Complete, but some issues were recorded |
+| 130 | Interrupted |
+
+## What it records, and what it won't do
+
+For every media file and sidecar (NFO, subtitles, artwork): path, size, modified time, kind, and for video the full ffprobe output.
+
+It skips:
+
+- symlinks, so it can't wander off the share or loop forever
+- NAS and OS system folders: `@eaDir`, `#recycle`, `#snapshot`, `@Recycle`, `$RECYCLE.BIN`, `.snapshot` and so on (case-insensitive)
+- macOS `._` files, which SMB shares love to leave lying around with a `.mkv` on the end
+
+It reports, rather than ignores:
+
+- folders it can't read
+- an empty or missing root, usually a share that didn't mount
+- filenames that aren't valid UTF-8 (recorded byte-for-byte, but later stages won't rename them)
+- files ffprobe rejects
+
+Files that vanish between scans are marked not present. They're never deleted from the catalogue. And if anything stopped a root being scanned completely, nothing in that root gets marked missing at all. An unmounted share looking like an empty library is exactly how a tool like this ruins someone's weekend.
+
+## Metadata providers (from Stage 2)
+
+Bring your own keys. Every user needs their own account with each provider. Nothing is bundled, and keys never go in the repo, the logs or the catalogue.
+
+- **TMDB.** Free key for non-commercial use. This product uses the TMDB API but is not endorsed or certified by TMDB.
+- **TheTVDB.** Opt-in. You'll need your own TheTVDB account and API key, and a subscription PIN if your key type requires one. Read their terms for your own use. Not my call to make for you.
+
+## Tests
+
+```bash
+pytest -q
+```
+
+57 tests. They run against throwaway folders in a temp directory, never a real library.
+
+## Licence
+
+None yet, so all rights reserved by default. That'll change before this goes public.
