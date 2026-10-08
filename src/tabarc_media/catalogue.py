@@ -1,6 +1,7 @@
 """SQLite catalogue. Media itself is never written by this module."""
 
 import json
+from contextlib import contextmanager
 import sqlite3
 import threading
 import time
@@ -17,6 +18,7 @@ KINDS = {
 }
 VALID_MEDIA = frozenset({"films", "television", "anime", "ebooks", "audiobooks", "music", "comics", "photographs", "home-videos", "other"})
 VALID_APPS = frozenset({"plex", "jellyfin", "emby", "calibre", "audiobookshelf", "kavita", "komga", "navidrome", "folders"})
+SCAN_PROFILES = frozenset({"quiet", "balanced", "fast"})
 
 def classify(name: str) -> str:
     suffix = Path(name).suffix.lower()
@@ -39,7 +41,9 @@ class Catalogue:
                 CREATE TABLE IF NOT EXISTS libraries (
                     id INTEGER PRIMARY KEY, name TEXT NOT NULL,
                     root TEXT UNIQUE NOT NULL, media_types TEXT NOT NULL,
-                    applications TEXT NOT NULL, added_at REAL NOT NULL,
+                    applications TEXT NOT NULL,
+                    scan_profile TEXT NOT NULL DEFAULT 'balanced',
+                    added_at REAL NOT NULL,
                     last_scan_at REAL
                 );
                 CREATE TABLE IF NOT EXISTS files (
@@ -60,16 +64,26 @@ class Catalogue:
                     created_at REAL NOT NULL, updated_at REAL NOT NULL
                 );
             """)
+            if "scan_profile" not in {
+                row["name"] for row in db.execute("PRAGMA table_info(libraries)")
+            }:
+                db.execute("ALTER TABLE libraries ADD COLUMN scan_profile TEXT NOT NULL DEFAULT 'balanced'")
+            db.execute("PRAGMA journal_mode=WAL")
             # A process can disappear mid-scan. The next start can resume safely
             # by rescanning; untouched files remain in the catalogue.
             db.execute("UPDATE jobs SET state='paused', message='Interrupted on restart' WHERE state='running'")
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.db_path, timeout=15)
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA busy_timeout=15000")
-        return db
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("PRAGMA busy_timeout=15000")
+            with db:
+                yield db
+        finally:
+            db.close()
 
     @staticmethod
     def _dict(row):
@@ -91,7 +105,8 @@ class Catalogue:
     def library(self, library_id: int):
         return next((lib for lib in self.libraries() if lib["id"] == library_id), None)
 
-    def add_library(self, name: str, root: Path, media_types: list[str], applications: list[str]):
+    def add_library(self, name: str, root: Path, media_types: list[str],
+                    applications: list[str], scan_profile: str = "balanced"):
         root = root.expanduser()
         if not root.is_absolute() or root.is_symlink() or not root.is_dir():
             raise ValueError("Choose an existing, absolute directory (not a symbolic link).")
@@ -104,6 +119,8 @@ class Catalogue:
             raise ValueError("Select at least one recognised media type.")
         if not set(applications).issubset(VALID_APPS):
             raise ValueError("Unknown media application.")
+        if scan_profile not in SCAN_PROFILES:
+            raise ValueError("Unknown resource profile.")
         for item in self.libraries():
             existing = Path(item["root"])
             if root.is_relative_to(existing) or existing.is_relative_to(root):
@@ -111,9 +128,9 @@ class Catalogue:
         try:
             with self.write_lock, self.connect() as db:
                 cursor = db.execute(
-                    "INSERT INTO libraries(name,root,media_types,applications,added_at) VALUES(?,?,?,?,?)",
+                    "INSERT INTO libraries(name,root,media_types,applications,scan_profile,added_at) VALUES(?,?,?,?,?,?)",
                     (name.strip(), str(root), json.dumps(sorted(set(media_types))),
-                     json.dumps(sorted(set(applications))), utc_now())
+                     json.dumps(sorted(set(applications))), scan_profile, utc_now())
                 )
                 return cursor.lastrowid
         except sqlite3.IntegrityError as exc:
