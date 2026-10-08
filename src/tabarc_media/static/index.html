@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>TABARC Media Organiser</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="site-header">
+    <div class="brand"><span class="logo" aria-hidden="true">T</span>
+      <div><strong>TABARC Media Organiser</strong><small>Local library management</small></div>
+    </div>
+    <span class="state-pill" id="mode">Read-only preview</span>
+  </header>
+
+  <main id="main" class="page">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">Your media, properly catalogued</p>
+        <h1>A tidier library, without the fuss.</h1>
+        <p>Add the folders you already use. The organiser will index their contents at a gentle pace and show what needs attention. This early version doesn't rename, move or delete any media files.</p>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="Library summary">
+      <div class="metric"><span>Libraries</span><strong id="metric-libraries">—</strong></div>
+      <div class="metric"><span>Files indexed</span><strong id="metric-files">—</strong></div>
+      <div class="metric"><span>Worker</span><strong id="metric-worker">Idle</strong></div>
+    </section>
+
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <div class="columns">
+      <section class="panel" aria-labelledby="add-title">
+        <div class="panel-header">
+          <div><p class="eyebrow">First things first</p><h2 id="add-title">Add a library</h2></div>
+          <span class="soft-tag">Step 1</span>
+        </div>
+        <form id="library-form">
+          <label for="library-name">Library name</label>
+          <input id="library-name" name="name" placeholder="Films and television" maxlength="100" required>
+
+          <label for="library-root">Folder on this computer or server</label>
+          <input id="library-root" name="root" placeholder="/mnt/media" required spellcheck="false">
+          <p class="hint">Enter an existing absolute folder path. A server-side folder picker is planned for a later release.</p>
+
+          <fieldset>
+            <legend>What does it contain?</legend>
+            <div class="choice-grid" id="media-types">
+              <label><input type="checkbox" name="media" value="films" checked> Films</label>
+              <label><input type="checkbox" name="media" value="television" checked> Television</label>
+              <label><input type="checkbox" name="media" value="anime"> Anime</label>
+              <label><input type="checkbox" name="media" value="ebooks"> Ebooks</label>
+              <label><input type="checkbox" name="media" value="audiobooks"> Audiobooks</label>
+              <label><input type="checkbox" name="media" value="music"> Music</label>
+              <label><input type="checkbox" name="media" value="comics"> Comics / manga</label>
+              <label><input type="checkbox" name="media" value="photographs"> Photos</label>
+              <label><input type="checkbox" name="media" value="home-videos"> Home videos</label>
+              <label><input type="checkbox" name="media" value="other"> Other files</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Applications using this library</legend>
+            <div class="choice-grid">
+              <label><input type="checkbox" name="app" value="plex"> Plex</label>
+              <label><input type="checkbox" name="app" value="jellyfin"> Jellyfin</label>
+              <label><input type="checkbox" name="app" value="emby"> Emby</label>
+              <label><input type="checkbox" name="app" value="calibre"> Calibre</label>
+              <label><input type="checkbox" name="app" value="audiobookshelf"> Audiobookshelf</label>
+              <label><input type="checkbox" name="app" value="kavita"> Kavita</label>
+              <label><input type="checkbox" name="app" value="komga"> Komga</label>
+              <label><input type="checkbox" name="app" value="navidrome"> Navidrome</label>
+              <label><input type="checkbox" name="app" value="folders" checked> Folders only</label>
+            </div>
+          </fieldset>
+
+          <label for="scan-profile">Background activity</label>
+          <select id="scan-profile" name="scan_profile">
+            <option value="quiet">Quiet — take your time</option>
+            <option value="balanced" selected>Balanced — small batches</option>
+            <option value="fast">Fast — shorter pauses (manual)</option>
+          </select>
+          <p class="hint">No full-file hashing or media conversion takes place during an ordinary scan.</p>
+          <button class="primary" type="submit">Add library</button>
+        </form>
+      </section>
+
+      <div class="right-column">
+        <section class="panel" aria-labelledby="libraries-title">
+          <div class="panel-header"><div><p class="eyebrow">Your collection</p>
+            <h2 id="libraries-title">Libraries</h2></div><span class="soft-tag">Step 2</span></div>
+          <div id="libraries" class="library-list"><p class="empty">No libraries added yet.</p></div>
+        </section>
+        <section class="panel" aria-labelledby="jobs-title">
+          <div class="panel-header"><div><p class="eyebrow">Background activity</p>
+            <h2 id="jobs-title">Recent scans</h2></div></div>
+          <div id="jobs" class="jobs-list"><p class="empty">Nothing running.</p></div>
+        </section>
+        <section class="panel" aria-labelledby="preview-title">
+          <div class="panel-header"><div><p class="eyebrow">No changes applied</p>
+            <h2 id="preview-title">Filename suggestions</h2></div></div>
+          <p class="hint">Suggestions come from filenames alone and need checking against proper metadata. This preview cannot rename anything.</p>
+          <div id="proposals"><p class="empty">Run a scan, then select Preview.</p></div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <footer>Local-first, and read-only until the file-operation engine has earned some trust.</footer>
+</body>
+</html>
