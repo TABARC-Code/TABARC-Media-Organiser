@@ -6,7 +6,7 @@ TABARC Media Organiser is a planned, self-hosted application for sorting and mai
 
 Most of that work should happen quietly in the background. The browser interface is there to configure libraries, see what the organiser has found and deal with genuine ambiguities — not to make the user supervise every file.
 
-> **Project status — planning and early development.** This repository currently contains design documents and development instructions, **not** a working installer, scanner, GUI or renaming engine. The first release will be read-only. The features below are the intended behaviour, not claims about completed code.
+> **Project status — v0.1 alpha, read-only prototype.** A local web dashboard, persistent SQLite catalogue, incremental scanner, scan controls and filename-pattern previews are now in development on the draft branch. This is **not** a finished organiser: media database matching, NFO creation, renaming, duplicate management, server integrations and AI connections are still planned. The preview does not write to media files.
 
 ## What it's for
 
@@ -97,7 +97,24 @@ The eventual deployment target is a local web service, initially on **Linux or D
 
 There will be selectable **Quiet**, **Balanced** and **Fast when idle** profiles. These remain design targets until there are actual benchmarks; network storage rarely behaves as conveniently as a local SSD.
 
-**There are no installation commands yet.** Don't clone this repository expecting a runnable application at this stage. The [roadmap](docs/roadmap.md) sets out the first working milestone: setup wizard, read-only scanner, SQLite catalogue, job controls and a useful report of proposed changes.
+### Try the read-only prototype
+
+The initial Python service is on the `design/local-first-foundation` branch, pending review. With Python 3.11 or later on Linux:
+
+```bash
+git clone https://github.com/TABARC-Code/TABARC-Media-Organiser.git
+cd TABARC-Media-Organiser
+git switch design/local-first-foundation
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[test]'
+python -m pytest -q
+python -m tabarc_media
+```
+
+Open `http://127.0.0.1:8787` on the same machine. Add an existing absolute media folder, choose its types and applications, and start a read-only scan. The selected application names are labels only in this release — no connection to Plex or Jellyfin is attempted. Review the [running instructions](docs/running.md) before pointing it at valuable data.
+
+This prototype provides a basic setup form rather than a complete first-run wizard, and it has no NFO exporter or automatic rename facility. The [roadmap](docs/roadmap.md) records what's next.
 
 ## Development
 
