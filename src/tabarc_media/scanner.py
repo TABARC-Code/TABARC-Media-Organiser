@@ -13,6 +13,21 @@ IGNORED_DIRS = frozenset({
 })
 BATCH = 64
 PROFILE_DELAY = {"quiet": 0.10, "balanced": 0.035, "fast": 0.005}
+KIND_SELECTION = {
+    "film": {"films", "television", "anime", "home-videos"},
+    "ebook": {"ebooks"},
+    "audiobook": {"audiobooks"},
+    "music": {"music"},
+    "comic": {"comics"},
+    "photo": {"photographs"},
+    "other": {"other"},
+}
+
+
+def selected_for_library(kind: str, media_types: list[str]) -> bool:
+    # Subtitles and metadata are tracked with their media. Video files cannot
+    # be split into film, series and anime by extension alone; matching comes later.
+    return kind == "sidecar" or bool(KIND_SELECTION.get(kind, set()) & set(media_types))
 
 
 class Scanner:
@@ -104,9 +119,12 @@ class Scanner:
                                     continue
                                 if not entry.is_file(follow_symlinks=False):
                                     continue
+                                kind = classify(entry.name)
+                                if not selected_for_library(kind, library["media_types"]):
+                                    continue
                                 stat = entry.stat(follow_symlinks=False)
                                 relative = str(Path(entry.path).relative_to(root))
-                                pending.append((relative, classify(entry.name),
+                                pending.append((relative, kind,
                                                 stat.st_size, stat.st_mtime_ns, utc_now()))
                                 seen += 1
                                 changed += 1  # Indexed entries, not claims of altered media.
