@@ -1,38 +1,108 @@
 # TABARC Media Organiser
 
-A local-first, low-resource media library organiser with a browser-based interface and optional AI integrations.
+**A local media librarian for people who've got better things to do than rename the same television series for the third time.**
 
-**Status:** Planning and foundation stage. No working media scanner or rename engine has been released yet.
+TABARC Media Organiser is a planned, self-hosted application for sorting and maintaining film, television, anime, book, audiobook, music and other media collections. The aim is fairly ordinary: point it at the folders you already use, tell it which media applications you run, and let it work out what belongs where. It should identify titles, clean up filenames, arrange episodes and editions correctly, retrieve metadata and prepare compatible sidecar files without demanding an evening of manual housekeeping.
 
-## Purpose
+Most of that work should happen quietly in the background. The browser interface is there to configure libraries, see what the organiser has found and deal with genuine ambiguities — not to make the user supervise every file.
 
-Organise existing personal media libraries without making users manually rename every file or create every metadata record. Target types include films, television, anime, ebooks, audiobooks, music, comics and photographs. Designed to work alongside Plex, Jellyfin, Emby, Calibre, Audiobookshelf, Kavita, Komga and Navidrome, with independent folder-only operation.
+> **Project status — planning and early development.** This repository currently contains design documents and development instructions, **not** a working installer, scanner, GUI or renaming engine. The first release will be read-only. The features below are the intended behaviour, not claims about completed code.
 
-## Principles
+## What it's for
 
-- **Useful without AI:** scanning, matching via configured reference databases, metadata generation and file operations must work deterministically.
-- **Local-first:** the server, catalogue and all file operations run on the user's machine.
-- **Quiet by default:** incremental scans, one low-priority worker, bounded I/O and backoff during system activity.
-- **Preview before trust:** begin read-only; introduce narrowly scoped, verified automatic changes only after user opt-in.
-- **No destructive automation:** don't delete or overwrite original media automatically.
-- **Multiple consumers:** more than one media application may use the same storage root; use app-specific output profiles.
-- **Optional AI:** an MCP tool interface plus adapters for cloud or local models, each restricted to approved operations.
-- **Portable records:** store provenance, stable identifiers, file relationships, sidecars and history in a local catalogue.
+A media folder rarely stays tidy by accident. One season arrives as `Series.S02.1080p.WEB-DL`, another is buried under its release-group name, and a special episode is sitting in Season 01 because that's where somebody happened to put it. Meanwhile, a film might exist in both theatrical and extended versions, or the audiobook and ebook of the same title may have been given entirely different names.
 
-## First milestone
+The organiser should recognise those distinctions before it starts moving things around. A release label may be disposable; an edition, language, subtitle association or episode order is not. The intention isn't to flatten everything into pretty filenames at the expense of useful information.
 
-A usable localhost setup wizard, media/app selection, root-folder configuration, SQLite catalogue, read-only incremental scanner, job progress and a proposed-change report. The first milestone **must not rename, move, delete or modify media files**.
+### Planned capabilities
 
-See [product specification](docs/product-spec.md), [security and safety model](docs/security-and-safety.md) and [delivery plan](docs/roadmap.md) as development progresses.
+- **Find and catalogue existing files.** Scan approved folders, read available technical and embedded metadata, and record which files have already been checked.
+- **Match the actual title.** Use established media databases and existing identifiers, with review for conflicting or uncertain results.
+- **Tidy names and folders.** Apply configurable conventions for films, series, seasons, episodes, specials, anime and multi-part releases.
+- **Look after related files.** Keep subtitles, artwork, extras, NFOs and other sidecars associated with the right item.
+- **Generate portable metadata.** Produce appropriate NFO, OPF, ComicInfo.xml, XMP or JSON reference records rather than treating a media server's internal database as the only copy.
+- **Handle editions properly.** Keep separate cuts, resolutions, languages, book editions and formats where those differences matter.
+- **Identify duplicate candidates.** Distinguish exact duplicates from alternate encodes and genuinely different editions. Nothing gets deleted automatically.
+- **Classify books and reference material.** Preserve available Dewey Decimal classifications with source attribution, alongside ordinary subjects and user-defined categories.
+- **Run gently.** Work incrementally, use low-priority background jobs and throttle expensive operations instead of monopolising a NAS.
+- **Offer optional AI assistance.** Expose approved catalogue operations through MCP or a provider interface for local and remote models. Basic organisation must never depend on an AI service.
+
+## Choose the applications you use
+
+The intended setup is a local webpage, with checkboxes for **multiple** media types and **multiple** applications. Running Plex and Jellyfin against the same film library is normal; the organiser shouldn't force you to choose one or pretend their metadata rules are identical.
+
+| Library | Planned integrations and formats |
+| --- | --- |
+| Films and television | Plex, Jellyfin, Emby; NFO and artwork |
+| Anime and cartoons | Series and episode-order matching, including appropriate anime data sources |
+| Ebooks | Calibre, Kavita; EPUB/PDF metadata, OPF and book references |
+| Audiobooks and podcasts | Audiobookshelf; chapters, authors, narrators and associated editions |
+| Music | Navidrome and other tag-based libraries; artist, album, track and recording IDs |
+| Comics and manga | Kavita, Komga; ComicInfo.xml and series/issue metadata |
+| Photographs and home videos | ExifTool, MediaInfo, FFprobe; capture dates, technical details and optional location metadata |
+| Other folders | Standalone cataloguing without a media-server connection |
+
+These are **integration targets**, not a claim that connectors already exist. Each will have its own tested adapter, and a folder-only setup must remain available for users who don't run any of the named software.
+
+## A typical clean-up
+
+For example, the organiser might find:
+
+```text
+Incoming/
+└── Example.Show.S02E03.1080p.WEB-DL.x265-GROUP.mkv
+```
+
+After matching the correct series and episode, a naming profile could propose:
+
+```text
+TV Shows/
+└── Example Show (2021)/
+    └── Season 02/
+        ├── Example Show (2021) - S02E03 - Episode Title.mkv
+        └── Example Show (2021) - S02E03 - Episode Title.nfo
+```
+
+The titles and dates here are placeholders, not real database results. The original filename, edition and technical information would remain in the catalogue even where the display name becomes shorter. The NFO would only be generated once the corresponding feature is enabled and its metadata verified.
+
+A badly matched file should go into a review queue. Calling an episode something confidently doesn't make it the right episode.
+
+## How it should work
+
+1. Open the local dashboard and select the types of media you keep.
+2. Tick the applications that use those libraries, then add the folders the organiser is allowed to inspect.
+3. Choose naming conventions, metadata providers, processing limits and whether changes need individual approval.
+4. Let the scanner build its local catalogue. Initial discovery reads files and reports findings without touching the collection.
+5. Review uncertain matches and proposed changes. Later releases will support carefully limited automatic renames where the identity and operation are properly verified.
+
+The background service is intended to carry on when the browser is closed. It will use a local SQLite catalogue, resumable jobs and modest concurrency; a full hash of every large video file is not an acceptable starting point for routine scanning.
+
+### Safe by default
+
+The first milestone is **read-only**. Later, the organiser will use a transaction journal, collision checks and explicit per-folder permissions before making authorised changes. Existing metadata and human corrections should survive a fresh scan. Originals will not be automatically deleted or overwritten.
+
+A fast guessed match is still a guess. The organiser should be able to say *I don't know* and leave the file alone, which is considerably more useful than quietly filing the wrong film under a plausible title.
+
+For the full design, see [product specification](docs/product-spec.md) and [security and safety](docs/security-and-safety.md).
+
+## Database providers and optional AI
+
+The planned metadata adapters include TMDB, TheTVDB, TVmaze, AniList, suitable book catalogues such as Open Library, MusicBrainz and other media-specific sources. Some providers require individual API keys or have usage conditions. The application will expose those settings in the GUI, keep credentials out of normal configuration files and provide sensible fallbacks when a service is unavailable.
+
+AI is optional by design. A local model, Claude or ChatGPT could help review ambiguous matches, suggest subjects or inspect a catalogue report through a restricted MCP interface. It should not get an unrestricted shell, be given the whole filesystem or be able to bypass the organiser's own file-operation checks. Disabling AI must not disable the librarian.
+
+## Performance and installation
+
+The eventual deployment target is a local web service, initially on **Linux or Docker**, with a browser-based interface bound to localhost by default. Windows and macOS packaging can follow after the file-handling core has been tested across platforms.
+
+There will be selectable **Quiet**, **Balanced** and **Fast when idle** profiles. These are design targets until actual benchmarks exist: we're not going to publish invented CPU figures or promise that network storage behaves like a local SSD.
+
+**There are no installation commands yet.** Don't clone this repository expecting a runnable application at this stage. The [roadmap](docs/roadmap.md) sets out the first working milestone: setup wizard, read-only scanner, SQLite catalogue, job controls and a useful report of proposed changes.
 
 ## Development
 
-The project uses UK English for documentation and messages. Claude Code and other coding agents should read `CLAUDE.md` before making changes. Do not claim that integration tests, metadata lookups or real filesystem operations have been validated unless they actually ran.
+This project is being developed under **TABARC-Code**. The immediate work is the filesystem inventory and matching groundwork, not an elaborate AI control panel. The latter is worth doing, but only after the application understands what it's looking at.
 
-## Licence and external metadata
+See [description.md](description.md) for the longer project brief and design reasoning, [CLAUDE.md](CLAUDE.md) for coding conventions and [the roadmap](docs/roadmap.md) for the staged build. Development notes and code comments use UK English and should explain the actual decisions, limitations and odd cases encountered along the way.
 
-A project licence has not yet been selected. External metadata services have different rate limits, attribution requirements and API access terms. Keep provider adapters independent and never ship other people's API keys or proprietary classification schedules.
-
-## Repository
-
-[TABARC-Code/TABARC-Media-Organiser](https://github.com/TABARC-Code/TABARC-Media-Organiser)
+Contributions, issue reports and corrections are welcome once there is something concrete to run or review. A licence still needs to be chosen; until then, don't assume the repository is released under an open-source licence simply because it is public.
