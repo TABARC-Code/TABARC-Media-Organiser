@@ -76,9 +76,13 @@ class Scanner:
 
     def shutdown(self):
         with self._lock:
-            if self._thread and self._thread.is_alive():
+            thread = self._thread
+            if thread and thread.is_alive():
                 self._pause.set()
-                self._thread.join(timeout=5)
+        # Don't hold the worker lock while joining. Its finally block needs
+        # the same lock to clear the active-job marker.
+        if thread and thread.is_alive():
+            thread.join(timeout=5)
 
     def _run(self, job_id: int, library: dict):
         root = Path(library["root"])
