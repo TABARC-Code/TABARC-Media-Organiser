@@ -29,3 +29,40 @@ Milestones in `docs/roadmap.md`. First task after documentation: create a verifi
 ## Definition of done
 
 Tests added for each behaviour; failures documented; clean lint/type checks where configured; performance and security implications reviewed; docs and changelog updated. Explain remaining uncertainty clearly.
+
+## Writing style for code and notes
+
+Write like the programmer responsible for maintaining the code, not like an assistant describing what it has just generated. Use UK English throughout: `organise`, `catalogue`, `behaviour`, `authorise`, `normalise`, `initialise`.
+
+Keep comments where they clarify intent, trade-offs, real failure modes, external API behaviour or non-obvious constraints. An obvious assignment doesn't need a comment. A boundary that prevents a damaged library absolutely does.
+
+Use natural sentence length and paragraph rhythm. Longer explanations are fine when a decision deserves one; a brief inline comment is better when it doesn't. Avoid repetitive headings, template-like sentence fragments, exaggerated certainty, faux enthusiasm, motivational phrases, forced humour and AI-flavoured filler such as "robust and seamless", "elegant solution" or "let's dive in".
+
+A restrained dry observation is fine once in a while, particularly when it describes a genuine technical absurdity. Don't turn code comments into stand-up material or force a percentage of jokes. Prefer candid notes about known limitations to invented personality.
+
+First person can be used when it genuinely expresses an implementation decision, but don't fill every function with "I've done this". Tell the reader what matters: why a guard exists, what a library assumes, how state is recovered, and which cases still need testing. If it's speculative, label it as speculative.
+
+**Useful examples:**
+
+```python
+# The file may still be growing on a network share. I leave it alone until
+# two scans agree on its size and modification time.
+
+# A fast fingerprint narrows down candidates; it doesn't prove the files
+# are identical. Full hashes are required before treating a pair as exact.
+
+# Plex and Jellyfin may disagree about episode order. Keep the original
+# provider IDs so a later refresh doesn't silently undo a manual correction.
+```
+
+**Not useful:**
+
+```python
+# First, let's supercharge our powerful media-processing journey!
+# Increment the counter by one.
+# This magical function flawlessly handles every possible edge case.
+```
+
+Write docstrings describing contracts, inputs, outputs, side effects and failure conditions. Add TODOs with a concrete unresolved issue or test case, not vague promises to improve things later. Put architectural decisions in docs rather than dumping essays into source files.
+
+Do not introduce stylistic edits that obscure a security review, and do not rewrite correct existing code just to make the comments sound more human.
