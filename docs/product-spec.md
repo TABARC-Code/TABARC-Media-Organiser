@@ -1,6 +1,6 @@
 # Product specification — local-first media organiser
 
-Status: design baseline; not implemented. British English throughout.
+Status: design baseline. A basic read-only inventory alpha is implemented; integration, matching and write features are still planned. British English throughout.
 
 ## Product goal
 
