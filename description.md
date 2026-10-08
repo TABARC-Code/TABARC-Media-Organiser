@@ -2,9 +2,9 @@
 
 ## The idea
 
-I've spent enough time sorting media folders to know that most of the work isn't difficult. It's just repetitive, fussy and surprisingly easy to get wrong. A title has been abbreviated, one episode belongs to a different season order, or a file has picked up six bits of technical shorthand that were useful at the time and are now just clutter. Multiply that by a sizeable film, television, book or music collection and what should be a straightforward filing job becomes an ongoing chore.
+Sorting media folders isn't particularly difficult work. It's repetitive, fussy and surprisingly easy to get wrong. A title has been abbreviated, one episode belongs to a different season order, or a file has picked up six bits of technical shorthand that were useful at the time and are now just clutter. Multiply that by a sizeable film, television, book or music collection and what should be a straightforward filing job becomes an ongoing chore.
 
-**TABARC Media Organiser** is intended to deal with that problem locally. It's a self-hosted, browser-controlled librarian that works out what a media file actually is, records the supporting information, and proposes or performs the right organisational work according to the user's settings. I want something that can be left alone to do the routine jobs without being given licence to rearrange the entire server on a hunch.
+**TABARC Media Organiser** is intended to deal with that problem locally. It's a self-hosted, browser-controlled librarian that works out what a media file actually is, records the supporting information, and proposes or performs the right organisational work according to the user's settings. Routine jobs should run unattended without giving the software licence to rearrange an entire server on a hunch.
 
 The application isn't being designed as a new media server. Plex, Jellyfin, Emby, Calibre, Audiobookshelf, Kavita, Komga and Navidrome already handle their own areas well enough. This sits alongside them, maintaining the files and portable metadata on which those applications rely. People using no media server at all should still be able to catalogue ordinary folders.
 
@@ -42,7 +42,7 @@ This application will often sit on a machine already doing other work. Somebody 
 
 The initial design is a single low-priority worker with incremental scanning, stored progress, bounded I/O, job pause/resume and configurable schedules. A file that hasn't changed shouldn't be probed again just because the organiser restarted. Large hashes are mainly for specific integrity and duplicate checks, not everyday discovery. Network shares need more patience than local disks, especially when files are still being copied into place.
 
-Quiet, Balanced and Fast-when-idle profiles should give people meaningful control over resource usage. We'll measure actual load when there's running code; fictional benchmark numbers look impressive right up until someone uses the software.
+Quiet, Balanced and Fast-when-idle profiles should give people meaningful control over resource usage. Actual load will need measuring once there's running code; fictional benchmark numbers look impressive right up until someone uses the software.
 
 ## Trust has to be earned
 
@@ -60,15 +60,15 @@ Where AI helps is the awkward material: unidentified recordings, misleading titl
 
 Neither type of model should have unrestricted filesystem access. The application should check every operation itself, regardless of who suggested it. A plausible paragraph from a model is not a transaction log.
 
-## How I'm approaching development
+## Development approach
 
 The first release target is Linux/Docker with a local web GUI, SQLite catalogue, incremental read-only scanner, basic file inspection, job controls and a change report. Matching, validated renaming, portable metadata export and consumer integrations follow in separate stages. More media formats, duplicate analysis and optional AI support come once the fundamentals hold up under real tests.
 
 The codebase should be modular without being needlessly elaborate. Media-specific handlers, provider adapters and the file-operation engine each have distinct responsibilities. Tests need to cover the unpleasant cases early: bad filenames, false matches, odd Unicode, broken network mounts, interrupted transfers, duplicate target names and incomplete metadata. Those aren't theoretical edge cases in a real media collection; they're Tuesday.
 
-Comments and development notes will be written in UK English, from the perspective of somebody who actually has to maintain the code. They should say *why* something behaves a particular way, what assumption is being made and what could go wrong. They shouldn't be padded with mechanical explanations of obvious statements, theatrical warnings or the usual procession of cheerful AI-generated remarks.
+Comments and development notes will be written in UK English, from the perspective of somebody who actually has to maintain the code. They should say *why* something behaves a particular way, what assumption is being made and what could go wrong. They shouldn't be padded with mechanical explanations of obvious statements, theatrical warnings or needless cheerfulness.
 
-The long-term goal is a small, trustworthy service that can work away in the background and leave a collection in better condition than it found it. If the user can forget it's running until there is something genuinely worth reviewing, we've probably got the design about right.
+The long-term goal is a small, trustworthy service that can work away in the background and leave a collection in better condition than it found it. If it can be forgotten until there's something genuinely worth reviewing, the design is doing its job.
 
 ## Project documents
 
@@ -76,6 +76,5 @@ The long-term goal is a small, trustworthy service that can work away in the bac
 - [Product specification](docs/product-spec.md) — intended user flows, formats, integrations and components.
 - [Security and safety](docs/security-and-safety.md) — permissions, credentials and file-operation rules.
 - [Roadmap](docs/roadmap.md) — the intended sequence of testable development milestones.
-- [CLAUDE.md](CLAUDE.md) — coding-agent instructions and development conventions.
 
 This is a public development repository. An open-source licence has not yet been selected, and reference utilities or third-party metadata must only be reused in ways their licences permit.
