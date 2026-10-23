@@ -1,8 +1,8 @@
 # TABARC Media Organiser: default configuration.
 #
-# Copy this to ~/.config/tabarc-media/config.toml and edit there.
-# Never put API keys in this file. Unknown keys are rejected, so a typo
-# fails loudly instead of being ignored.
+# `tabarc-media init` writes this to ~/.config/tabarc-media/config.toml.
+# Edit that copy, not this one. Never put API keys in this file. Unknown
+# keys are rejected, so a typo fails loudly instead of being ignored.
 
 [database]
 # Must be on local disk. Not on the NAS, not inside a library root.

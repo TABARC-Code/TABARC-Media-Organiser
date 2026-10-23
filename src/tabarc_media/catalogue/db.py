@@ -80,6 +80,46 @@ class CatalogueError(RuntimeError):
     """Raised when the catalogue cannot be opened safely."""
 
 
+class ScanLock:
+    """Exclusive lock so only one scan writes to a catalogue at a time.
+
+    Two scans at once would each mark the other's files missing. Uses
+    flock on a file next to the database, so the lock dies with the
+    process: a crash or kill -9 can't leave it stuck. On systems without
+    fcntl (Windows) this is a no-op, which the README says.
+    """
+
+    def __init__(self, db_path: Path):
+        db_path = Path(db_path).expanduser()
+        self.path = db_path.with_name(db_path.name + ".lock")
+        self._fh = None
+
+    def __enter__(self) -> "ScanLock":
+        try:
+            import fcntl
+        except ImportError:
+            return self
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(self.path, "a")
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            fh.close()
+            raise CatalogueError(
+                "Another scan is already running against this catalogue. "
+                "Wait for it to finish, or stop it."
+            ) from None
+        self._fh = fh
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if self._fh is not None:
+            import fcntl
+            fcntl.flock(self._fh, fcntl.LOCK_UN)
+            self._fh.close()
+            self._fh = None
+
+
 def _unescape_mount(field: str) -> str:
     # /proc/mounts escapes spaces, tabs, newlines and backslashes as octal.
     return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), field)

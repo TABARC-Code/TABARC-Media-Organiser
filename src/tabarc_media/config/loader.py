@@ -9,9 +9,11 @@ can mean scanning a snapshot folder ten times over.
 
 from __future__ import annotations
 
+import json
 import os
 import tomllib
 from dataclasses import dataclass
+from importlib import resources
 from pathlib import Path
 
 
@@ -19,7 +21,7 @@ class ConfigError(ValueError):
     """Raised when configuration is missing or invalid."""
 
 
-# These mirror config/default.toml. A test keeps the two in step.
+# These mirror the packaged default.toml. A test keeps the two in step.
 #
 # Exclusions cover common NAS and OS system folders. Names that don't
 # exist on a given box are harmless. Matching is case-insensitive.
@@ -72,6 +74,42 @@ class Config:
 def default_inventory() -> InventoryConfig:
     """Inventory settings used when the config omits [inventory]."""
     return _build_inventory({})
+
+
+def default_config_text() -> str:
+    """The packaged default.toml, as text."""
+    return resources.files("tabarc_media.config").joinpath("default.toml").read_text("utf-8")
+
+
+def write_initial_config(path: Path, roots: list[str]) -> Config:
+    """Write a starter config to *path* and return it, validated.
+
+    Refuses to overwrite an existing file. The text is validated before
+    it lands, so a bad root (relative, nested, duplicated) never leaves a
+    half-written config behind.
+    """
+    path = Path(path).expanduser()
+    if path.exists():
+        raise ConfigError(f"Config already exists, not overwriting: {path}")
+
+    text = default_config_text()
+    if roots:
+        # JSON string escapes are valid TOML basic-string escapes.
+        listed = ", ".join(json.dumps(r) for r in roots)
+        if "\nroots = []\n" not in text:
+            raise ConfigError("Packaged default.toml has no 'roots = []' line to fill in")
+        text = text.replace("\nroots = []\n", f"\nroots = [{listed}]\n", 1)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, "utf-8")
+    try:
+        cfg = load_config(tmp)
+    except ConfigError:
+        tmp.unlink()
+        raise
+    os.replace(tmp, path)
+    return cfg
 
 
 # ---------------------------------------------------------------- helpers

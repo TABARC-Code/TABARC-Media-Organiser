@@ -8,17 +8,20 @@ version = "0.1.0"
 description = "Read-only media inventory and catalogue for Plex and Jellyfin libraries"
 readme = "README.md"
 authors = [{ name = "TABARC-Code" }]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "pyflakes>=3"]
 
 [project.scripts]
 tabarc-media = "tabarc_media.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"tabarc_media.config" = ["default.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

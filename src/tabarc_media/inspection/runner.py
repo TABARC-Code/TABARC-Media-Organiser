@@ -47,6 +47,7 @@ class ScanSummary:
     issues: int = 0
     probes_run: int = 0
     probes_failed: int = 0
+    abandoned_before: int = 0
     roots_not_reconciled: list[str] = field(default_factory=list)
 
 
@@ -189,15 +190,23 @@ def run_inventory(conn: sqlite3.Connection, cfg: Config, *, probe: bool,
                   progress: Callable[[ScanSummary], None] | None = None) -> ScanSummary:
     """Scan every configured root. Returns a summary; never deletes rows.
 
+    Call this while holding a ScanLock. Under the lock, any scan still
+    marked "running" can't really be running, so it's marked "abandoned"
+    (a crash or kill -9 left it there).
+
     Ctrl-C is caught and recorded as "interrupted". Any other exception is
     recorded as "failed" and re-raised.
     """
+    abandoned = conn.execute(
+        "UPDATE scan_jobs SET status = 'abandoned', finished_at = ? WHERE status = 'running'",
+        (_now(),),
+    ).rowcount
     cur = conn.execute(
         "INSERT INTO scan_jobs (started_at, status, roots_json) VALUES (?, 'running', ?)",
         (_now(), json.dumps([str(r) for r in cfg.roots])),
     )
     conn.commit()
-    s = ScanSummary(job_id=cur.lastrowid)
+    s = ScanSummary(job_id=cur.lastrowid, abandoned_before=abandoned)
     try:
         for root in cfg.roots:
             _scan_root(conn, root, cfg, probe, s, progress)

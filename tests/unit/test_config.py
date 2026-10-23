@@ -22,9 +22,10 @@ def _db(tmp_path: Path) -> str:
 
 def test_default_toml_matches_loader_defaults():
     # Stops config/default.toml and the code drifting apart.
-    with (REPO / "config" / "default.toml").open("rb") as fh:
+    packaged = REPO / "src" / "tabarc_media" / "config" / "default.toml"
+    with packaged.open("rb") as fh:
         raw = tomllib.load(fh)
-    cfg = load_config(REPO / "config" / "default.toml")
+    cfg = load_config(packaged)
     assert cfg.inventory == default_inventory()
     assert raw["libraries"]["roots"] == []
 

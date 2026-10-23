@@ -21,11 +21,11 @@ Stage 1 of six. Read-only inventory only.
 
 ## Requirements
 
-- Python 3.12 or newer
+- Python 3.11 or newer (tested on 3.11, 3.12 and 3.13)
 - ffprobe (part of FFmpeg), optional but you'll want it. Without it the scan still runs, it just can't tell you anything about the video streams.
 - Linux is what it's tested on. macOS should work but the network-filesystem check won't run there.
 
-No Python packages needed at runtime. Honestly, it's standard library all the way down for now.
+No Python packages needed at runtime. It's standard library all the way down, for now.
 
 ## Install
 
@@ -40,16 +40,10 @@ pip install -e '.[test]'
 ## Configure
 
 ```bash
-mkdir -p ~/.config/tabarc-media
-cp config/default.toml ~/.config/tabarc-media/config.toml
+tabarc-media init --roots /mnt/nas/Movies /mnt/nas/TV /mnt/nas/Books
 ```
 
-Then edit the copy. At minimum, set your roots:
-
-```toml
-[libraries]
-roots = ["/mnt/nas/Movies", "/mnt/nas/TV", "/mnt/nas/Books"]
-```
+That writes `~/.config/tabarc-media/config.toml`, checked before it lands, and won't overwrite one that's already there. Leave out `--roots` and add them by hand under `[libraries]` if you'd rather. The commented template it starts from ships inside the package, so it works from a plain `pip install` too.
 
 Things the loader will refuse, on purpose:
 
@@ -65,9 +59,14 @@ Things the loader will refuse, on purpose:
 ```bash
 tabarc-media inventory              # scan, with ffprobe
 tabarc-media inventory --no-probe   # quick first pass, no ffprobe
+tabarc-media stats                  # what the catalogue holds, per root, with total size
 tabarc-media issues                 # what went wrong in the last scan
 tabarc-media issues --scan 4        # ...or a specific one
 ```
+
+`stats` is the quick way to check the catalogue agrees with what you think is on the box. Sizes are in binary units (GiB, TiB), which is what most NAS dashboards show.
+
+Only one scan can run against a catalogue at a time. A second one is refused with a clear message. The lock belongs to the process, so a crash or `kill -9` can't leave it stuck, and a scan that died without finishing is marked `abandoned` next time round. (Locking needs Linux or macOS. On Windows it's skipped, so don't run two.)
 
 The first full scan of a big NAS will take a while, mostly ffprobe. Later scans only probe files whose size or modified time changed, so they're much quicker. If you stop a scan with Ctrl-C, nothing's lost. Run it again and it picks up the expensive work where it left off.
 
@@ -76,7 +75,7 @@ The first full scan of a big NAS will take a while, mostly ffprobe. Later scans 
 | Code | Meaning |
 |---|---|
 | 0 | Complete, no issues |
-| 2 | Config or catalogue problem, nothing scanned |
+| 2 | Config or catalogue problem, or another scan already running. Nothing scanned |
 | 3 | Complete, but some issues were recorded |
 | 130 | Interrupted |
 
@@ -112,7 +111,7 @@ Bring your own keys. Every user needs their own account with each provider. Noth
 pytest -q
 ```
 
-57 tests. They run against throwaway folders in a temp directory, never a real library.
+They run against throwaway folders in a temp directory, never a real library. CI runs them on Python 3.11, 3.12 and 3.13.
 
 ## Acknowledgements
 

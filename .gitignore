@@ -8,3 +8,5 @@ __pycache__/
 # Local config may hold API keys from Stage 2 on.
 config/local*.toml
 .env
+build/
+dist/

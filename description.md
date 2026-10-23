@@ -11,7 +11,7 @@ Currently at Stage 1: read-only inventory. No renaming yet. That's the point.
 - Read-only scan with ffprobe probing, resumable and cheap to re-run
 - Reports unreadable folders and unmounted shares instead of quietly treating them as empty
 - Never deletes catalogue rows; vanished files are marked, not forgotten
-- Refuses to put its database on a network share
+- Refuses to put its database on a network share, and refuses to run two scans at once
 - Bring-your-own-key provider model (TMDB, TheTVDB opt-in) from Stage 2
 - Standard-library Python, no runtime dependencies
 
