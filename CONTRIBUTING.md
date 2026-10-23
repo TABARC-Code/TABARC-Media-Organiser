@@ -14,11 +14,9 @@ Short version: the tool must never lose or damage someone's library, and it must
 6. A provider failure never erases metadata we already hold.
 7. If a scan couldn't see part of a root, it marks nothing missing in that root. A silent gap is a bug.
 
-## Providers and keys
+## Providers
 
-Everyone brings their own account and key for each provider, from local config or an environment variable. An adapter stays off until its key is present. Keys are never committed, logged or written to the catalogue.
-
-TMDB is free for non-commercial use and needs the credit line in ACKNOWLEDGEMENTS.md shown in the tool's About output. TheTVDB is opt-in: your own account, key and PIN if your key type needs one, and no images or trailers are fetched from it. Check their terms for your own use.
+Keyless sources come first: Wikidata, TVmaze and Open Library. Each one's licence and attribution is listed in ACKNOWLEDGEMENTS.md. Keyed services (TMDB, TheTVDB) are optional, and each user supplies their own key. Keys are never committed, logged or stored in the catalogue. IMDb datasets are not used. Their terms rule out repackaging.
 
 ## Config
 
