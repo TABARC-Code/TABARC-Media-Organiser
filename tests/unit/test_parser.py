@@ -27,6 +27,8 @@ def test_films(name, title, year):
         ("show name - s1e12 - Pilot.mkv", "show name", 1, 12),
         ("Show Name 2x05 Title.mkv", "Show Name", 2, 5),
         ("Show.Name.S02E005.mkv", "Show Name", 2, 5),
+        ("Show Name Season 2 Episode 5.mkv", "Show Name", 2, 5),
+        ("Show.Name.S02.E05.mkv", "Show Name", 2, 5),
     ],
 )
 def test_episodes(name, title, season, episode):

@@ -19,6 +19,7 @@ _RELEASE_TAG = re.compile(
 )
 _SXXEYY = re.compile(r"(?i)(?:^|[\s._-])S(\d{1,2})[ ._-]?E(\d{1,3})(?![\dE])")
 _MULTI_EPISODE = re.compile(r"(?i)(?:^|[\s._-])S\d{1,2}[ ._-]?E\d{1,3}(?:[ ._-]?-?E\d{1,3})+(?=$|[\s._-])")
+_SEASON_EPISODE_WORDS = re.compile(r"(?i)(?:^|[\s._-])season[ ._-]?(\d{1,2})[ ._-]+episode[ ._-]?(\d{1,3})(?![\dA-Za-z])")
 _NXNN = re.compile(r"(?<![\dA-Za-z])(\d{1,2})x(\d{2,3})(?![\dA-Za-z])")
 _YEAR = re.compile(r"(?:^|[\s._(\[-])((?:19|20)\d{2})(?=$|[\s._)\]-])")
 _BRACKETS = re.compile(r"\[[^\]]*\]|\{[^}]*\}")
@@ -60,6 +61,9 @@ def parse_filename(name: str) -> ParsedName:
 
     m = _SXXEYY.search(stem)
     if m:
+        season, episode = int(m.group(1)), int(m.group(2))
+        cut = min(cut, m.start())
+    elif (m := _SEASON_EPISODE_WORDS.search(stem)):
         season, episode = int(m.group(1)), int(m.group(2))
         cut = min(cut, m.start())
     else:
