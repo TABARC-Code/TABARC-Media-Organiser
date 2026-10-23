@@ -6,6 +6,15 @@ A self-hosted catalogue for a media library that's grown faster than anyone's pa
 
 Right now it does one thing: it looks. It walks your library, records what's there, and asks ffprobe what each video actually is. It doesn't rename, move, tag or delete anything. That's deliberate. The renaming comes later, once there's a catalogue worth trusting and a plan you can read before anything happens.
 
+## Principles
+
+- Useful without AI. Scanning, matching against reference databases and file operations are deterministic.
+- Local first. The catalogue lives on local disk, and your library is read where it sits.
+- Preview before trust. Everything starts read-only, and changes come only from a plan you've read.
+- No destructive automation. Originals are never deleted or overwritten automatically.
+- More than one consumer. Plex and Jellyfin may share a storage root, so output will get per-app profiles.
+- Portable records. Provenance, identifiers and history stay in the catalogue.
+
 ## Status
 
 Stage 1 of six. Read-only inventory only.
@@ -119,4 +128,4 @@ Some of the Stage 2 design leans on ideas from [Ticket Booth](https://github.com
 
 ## Licence
 
-None yet, so all rights reserved by default. That'll change before this goes public.
+MIT. See [LICENSE](LICENSE). Metadata providers have their own terms on rate limits, attribution and API access, so check those for your own use. Nobody's API keys ship with this.
