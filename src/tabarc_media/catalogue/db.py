@@ -15,7 +15,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2 adds identity_matches (review queue). 1 -> 2 is additive.
 
 # Filesystem types where SQLite locking is unreliable. SQLite's own docs
 # warn against network filesystems; this list is the common Linux names.
@@ -73,6 +73,25 @@ CREATE TABLE IF NOT EXISTS scan_issues (
     kind      TEXT NOT NULL,
     detail    TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS identity_matches (
+    id              INTEGER PRIMARY KEY,
+    root            TEXT NOT NULL,
+    rel_path        TEXT NOT NULL,
+    status          TEXT NOT NULL
+                    CHECK (status IN ('matched', 'pending', 'none', 'accepted', 'rejected')),
+    reason          TEXT NOT NULL,
+    parsed_title    TEXT,
+    parsed_year     INTEGER,
+    season          INTEGER,
+    episode         INTEGER,
+    candidates      TEXT NOT NULL,
+    providers_failed TEXT NOT NULL,
+    chosen_provider TEXT,
+    chosen_id       TEXT,
+    updated_on      TEXT NOT NULL,
+    UNIQUE (root, rel_path)
+);
+CREATE INDEX IF NOT EXISTS idx_identity_status ON identity_matches (status);
 """
 
 
@@ -180,6 +199,11 @@ def connect(path: Path) -> sqlite3.Connection:
             "INSERT INTO schema_info (key, value) VALUES ('version', ?)",
             (str(SCHEMA_VERSION),),
         )
+        conn.commit()
+    elif row["value"] == "1" and SCHEMA_VERSION == 2:
+        # SCHEMA above is idempotent, so the identity table already exists here.
+        # Only the recorded version needs moving on.
+        conn.execute("UPDATE schema_info SET value = '2' WHERE key = 'version'")
         conn.commit()
     elif row["value"] != str(SCHEMA_VERSION):
         conn.close()
