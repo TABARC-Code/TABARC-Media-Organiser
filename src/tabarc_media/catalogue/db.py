@@ -11,8 +11,12 @@ deleted by the inventory: files that disappear are marked not present.
 from __future__ import annotations
 
 import os
+import importlib.util
 import re
 import sqlite3
+import subprocess
+import sys
+import warnings
 from pathlib import Path
 
 SCHEMA_VERSION = 2  # 2 adds identity_matches (review queue). 1 -> 2 is additive.
@@ -22,6 +26,7 @@ SCHEMA_VERSION = 2  # 2 adds identity_matches (review queue). 1 -> 2 is additive
 NETWORK_FS_TYPES = frozenset({
     "cifs", "smb3", "smbfs", "nfs", "nfs4", "afpfs", "9p",
     "fuse.sshfs", "fuse.rclone", "davfs", "fuse.davfs2",
+    "windows-network",  # a mapped network drive on Windows
 })
 
 SCHEMA = """
@@ -114,29 +119,62 @@ class ScanLock:
         self._fh = None
 
     def __enter__(self) -> "ScanLock":
-        try:
-            import fcntl
-        except ImportError:
-            return self
+        backend = _lock_backend()
+        if backend is None:
+            # No locking here means two scans could run at once. That's a silent
+            # gap, so refuse rather than carry on.
+            raise CatalogueError(
+                "This platform has no file-lock support, so two scans could run "
+                "at once. Refusing to scan."
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        fh = open(self.path, "a")
+        fh = open(self.path, "a+")
         try:
-            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+            _lock(fh, backend)
+        except OSError:
             fh.close()
             raise CatalogueError(
                 "Another scan is already running against this catalogue. "
                 "Wait for it to finish, or stop it."
             ) from None
         self._fh = fh
+        self._backend = backend
         return self
 
     def __exit__(self, *exc) -> None:
         if self._fh is not None:
-            import fcntl
-            fcntl.flock(self._fh, fcntl.LOCK_UN)
+            _unlock(self._fh, self._backend)
             self._fh.close()
             self._fh = None
+
+
+def _lock_backend() -> str | None:
+    """Which locking primitive this platform has: fcntl (Unix), msvcrt (Windows) or None."""
+    if importlib.util.find_spec("fcntl") is not None:
+        return "fcntl"
+    if importlib.util.find_spec("msvcrt") is not None:
+        return "msvcrt"
+    return None
+
+
+def _lock(fh, backend: str) -> None:
+    if backend == "fcntl":
+        import fcntl
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    else:
+        import msvcrt
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+
+
+def _unlock(fh, backend: str) -> None:
+    if backend == "fcntl":
+        import fcntl
+        fcntl.flock(fh, fcntl.LOCK_UN)
+    else:
+        import msvcrt
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def _unescape_mount(field: str) -> str:
@@ -145,20 +183,29 @@ def _unescape_mount(field: str) -> str:
 
 
 def filesystem_type(path: Path, mounts_file: Path = Path("/proc/self/mounts")) -> str | None:
-    """Return the filesystem type holding *path*, or None if unknown.
+    """Return the filesystem type holding *path*, or None if this platform can't tell.
 
-    Linux only: reads the mount table. On other systems it returns None
-    and no network check happens, which the README says plainly.
+    Linux reads the mount table. macOS parses `mount`. Windows asks whether
+    the drive is a network drive. Anywhere else returns None, and connect()
+    warns about it rather than pretending the check passed.
     """
+    if sys.platform == "win32":
+        return _windows_drive_kind(path)
+    if sys.platform == "darwin":
+        return _macos_fs_type(path)
     if not mounts_file.is_file():
         return None
+    return _fs_type_from_mounts(path, mounts_file.read_text(errors="replace"))
+
+
+def _fs_type_from_mounts(path: Path, table: str) -> str | None:
     target = Path(os.path.abspath(path))
     while not target.exists() and target != target.parent:
         target = target.parent
     target_str = str(target.resolve())
 
     best_len, fstype = -1, None
-    for line in mounts_file.read_text(errors="replace").splitlines():
+    for line in table.splitlines():
         parts = line.split()
         if len(parts) < 3:
             continue
@@ -168,6 +215,46 @@ def filesystem_type(path: Path, mounts_file: Path = Path("/proc/self/mounts")) -
             if len(mount_point) > best_len:
                 best_len, fstype = len(mount_point), parts[2]
     return fstype
+
+
+_MACOS_MOUNT_LINE = re.compile(r"^(.+?) on (.+?) \((\S+?)[,)]")
+
+
+def _fs_type_from_macos_mount(path: Path, table: str) -> str | None:
+    """Parse `mount` output lines such as '//user@nas/share on /Volumes/share (smbfs, nodev)'."""
+    target_str = str(Path(os.path.abspath(path)).resolve())
+    best_len, fstype = -1, None
+    for line in table.splitlines():
+        m = _MACOS_MOUNT_LINE.match(line)
+        if not m:
+            continue
+        mount_point, kind = m.group(2), m.group(3)
+        prefix = mount_point.rstrip("/") + "/"
+        if target_str == mount_point or target_str.startswith(prefix):
+            if len(mount_point) > best_len:
+                best_len, fstype = len(mount_point), kind
+    return fstype
+
+
+def _macos_fs_type(path: Path) -> str | None:
+    try:
+        out = subprocess.run(["mount"], capture_output=True, text=True, timeout=5, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return _fs_type_from_macos_mount(path, out.stdout)
+
+
+_DRIVE_REMOTE = 4
+
+
+def _windows_drive_kind(path: Path) -> str | None:
+    try:
+        import ctypes
+        drive = os.path.splitdrive(os.path.abspath(path))[0] + "\\"
+        kind = ctypes.windll.kernel32.GetDriveTypeW(drive)  # type: ignore[attr-defined]
+    except (AttributeError, OSError, ImportError):
+        return None
+    return "windows-network" if kind == _DRIVE_REMOTE else "windows-local"
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -183,6 +270,15 @@ def connect(path: Path) -> sqlite3.Connection:
         raise CatalogueError(
             f"Catalogue path {path} is on a network filesystem ({fstype}). "
             "SQLite is not safe there. Put the database on local disk."
+        )
+
+    if fstype is None:
+        warnings.warn(
+            f"Could not tell what filesystem {path} is on, so the network-storage "
+            "check was skipped. SQLite is unsafe on network shares, so keep the "
+            "catalogue on local disk.",
+            UserWarning,
+            stacklevel=2,
         )
 
     path.parent.mkdir(parents=True, exist_ok=True)

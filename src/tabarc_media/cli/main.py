@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from tabarc_media.config.loader import ConfigError, load_config, write_initial_c
 from tabarc_media.inspection.inventory import ffprobe_available
 from tabarc_media.inspection.runner import ScanSummary, run_inventory
 
-DEFAULT_CONFIG = Path("~/.config/tabarc-media/config.toml")
+DEFAULT_CONFIG = Path(os.environ.get("TABARC_CONFIG", "~/.config/tabarc-media/config.toml"))
 
 EXIT_OK = 0
 EXIT_CONFIG = 2

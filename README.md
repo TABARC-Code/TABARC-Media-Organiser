@@ -32,7 +32,8 @@ Stage 1 of six. Read-only inventory only.
 
 - Python 3.11 or newer (tested on 3.11, 3.12 and 3.13)
 - ffprobe (part of FFmpeg), optional but you'll want it. Without it the scan still runs, it just can't tell you anything about the video streams.
-- Linux is what it's tested on. macOS should work but the network-filesystem check won't run there.
+- Linux, macOS and Windows. CI runs the tests on all three. Linux and macOS are the ones the author runs. Windows is new and its results are advisory until it has a real run behind it.
+- The network-storage check works on Linux (mount table), macOS (`mount`) and Windows (drive type). If it can't tell what a path is on, it warns rather than passing quietly.
 
 No Python packages needed at runtime. It's standard library all the way down, for now.
 
@@ -45,6 +46,21 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[test]'
 ```
+
+## Docker
+
+The image runs the same CLI with media mounted read-only:
+
+```bash
+docker compose build
+docker compose run --rm tabarc-media init --roots /media/films --roots /media/tv
+docker compose run --rm tabarc-media inventory
+docker compose run --rm tabarc-media stats
+```
+
+Edit `docker-compose.yml` so the host paths point at your media. The `/media/...` paths inside the container must match the roots you pass to `init`. Keep `./config` on the Docker host's local disk, not on a network share. The catalogue is SQLite, and the tool refuses to open it on a network mount it can detect.
+
+The config path can also be set with the `TABARC_CONFIG` environment variable.
 
 ## Configure
 

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Callable
 
-VERSION = "0.2.0"
+from tabarc_media import __version__ as VERSION
 DEFAULT_TIMEOUT = 10.0
 DEFAULT_ATTEMPTS = 3
 

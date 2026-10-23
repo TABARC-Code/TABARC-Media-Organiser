@@ -1,0 +1,17 @@
+# Example only. Change the host paths to yours.
+#
+#   docker compose run --rm tabarc-media init --roots /media/films --roots /media/tv
+#   docker compose run --rm tabarc-media inventory
+#   docker compose run --rm tabarc-media stats
+#
+# Config and catalogue go in ./config on the Docker host's local disk.
+# The media is mounted read-only, so nothing can be changed from here.
+
+services:
+  tabarc-media:
+    build: .
+    image: tabarc-media-organiser:local
+    volumes:
+      - ./config:/config
+      - /path/on/your/host/Films:/media/films:ro
+      - /path/on/your/host/TV:/media/tv:ro
