@@ -114,6 +114,10 @@ pytest -q
 
 57 tests. They run against throwaway folders in a temp directory, never a real library.
 
+## Acknowledgements
+
+Some of the Stage 2 design leans on ideas from [Ticket Booth](https://github.com/aleiepure/ticketbooth) by Alessandro Iepure (GPL-3.0-or-later, now archived). Ideas only, no code. Details in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+
 ## Licence
 
 None yet, so all rights reserved by default. That'll change before this goes public.
