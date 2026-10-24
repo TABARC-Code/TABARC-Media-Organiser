@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from tabarc_media.config.loader import ConfigError, default_inventory, load_config
+from tabarc_media.config.loader import (
+    ConfigError, default_inventory, default_providers, load_config,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -27,6 +29,7 @@ def test_default_toml_matches_loader_defaults():
         raw = tomllib.load(fh)
     cfg = load_config(packaged)
     assert cfg.inventory == default_inventory()
+    assert cfg.providers == default_providers()
     assert raw["libraries"]["roots"] == []
 
 
@@ -115,3 +118,37 @@ def test_exclusions_lower_cased(tmp_path):
     body = _db(tmp_path) + '[inventory]\nexclude_dirs = ["$RECYCLE.BIN"]\n'
     cfg = load_config(_cfg(tmp_path, body))
     assert cfg.inventory.exclude_dirs == {"$recycle.bin"}
+
+
+def _cfg_text(tmp_path, extra=""):
+    db = tmp_path / "db" / "c.sqlite3"
+    return f'[database]\npath = "{db.as_posix()}"\n[libraries]\nroots = []\n{extra}'
+
+
+def test_providers_section_is_read_and_normalised(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text(_cfg_text(tmp_path, '[providers]\ncontact = "  me@example.org "\n'
+                           'language = "EN-GB"\nenabled = ["tvmaze", "tvmaze"]\n'
+                           'max_age_days = 7\n'))
+    cfg = load_config(p)
+    assert cfg.providers.contact == "me@example.org"
+    assert cfg.providers.language == "en-gb"
+    assert cfg.providers.enabled == ("tvmaze",)
+    assert cfg.providers.max_age_days == 7
+    assert cfg.providers.offline is False
+
+
+@pytest.mark.parametrize("bad", [
+    'enabled = ["imdb"]',
+    'offline = "yes"',
+    'max_age_days = -1',
+    'max_age_days = true',
+    'language = ""',
+    'contact = 5',
+    'nonsense = 1',
+])
+def test_bad_providers_values_are_rejected(tmp_path, bad):
+    p = tmp_path / "c.toml"
+    p.write_text(_cfg_text(tmp_path, f"[providers]\n{bad}\n"))
+    with pytest.raises(ConfigError):
+        load_config(p)

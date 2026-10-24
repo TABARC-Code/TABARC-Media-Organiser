@@ -141,3 +141,38 @@ def test_rate_limiter_waits_the_remaining_gap():
     now[0] = 100.25
     lim.wait()
     assert sleeps == [pytest.approx(0.75)]
+
+
+def _throttled_then_ok(retry_after):
+    state = {"n": 0}
+    sleeps = []
+
+    def opener(req, timeout=None):
+        state["n"] += 1
+        if state["n"] == 1:
+            hdrs = {"Retry-After": retry_after} if retry_after is not None else {}
+            raise urllib.error.HTTPError(req.full_url, 429, "slow down", hdrs, None)
+        return FakeResp(json.dumps([]).encode("utf-8"))
+
+    c = P.Client("ops@example.org", opener=opener, sleep=sleeps.append,
+                 clock=lambda: 1000.0, attempts=3)
+    return c, sleeps
+
+
+def test_retry_after_seconds_is_honoured():
+    c, sleeps = _throttled_then_ok("7")
+    c.get_json("tvmaze", "https://example.test/x", {})
+    assert 7.0 in sleeps
+
+
+def test_retry_after_is_capped():
+    c, sleeps = _throttled_then_ok("86400")
+    c.get_json("tvmaze", "https://example.test/x", {})
+    assert P.MAX_RETRY_AFTER in sleeps and 86400.0 not in sleeps
+
+
+@pytest.mark.parametrize("value", [None, "Wed, 21 Oct 2026 07:28:00 GMT", "soon"])
+def test_missing_or_unparseable_retry_after_falls_back_to_backoff(value):
+    c, sleeps = _throttled_then_ok(value)
+    c.get_json("tvmaze", "https://example.test/x", {})
+    assert 1.0 in sleeps

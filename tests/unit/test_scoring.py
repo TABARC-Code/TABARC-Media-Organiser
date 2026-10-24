@@ -50,6 +50,9 @@ def test_thin_names_always_go_to_review_even_with_a_perfect_hit():
     d = decide(parse_filename("Random Thing.mkv"), [cand("Random Thing")])
     assert d.status == "review"
     assert "too thin" in d.reason
+    # Candidates are kept so a person can pick one.
+    assert d.best is not None and d.best.candidate.title == "Random Thing"
+    assert len(d.ranked) == 1
 
 
 def test_multi_episode_and_empty_titles_never_accept():
@@ -74,3 +77,46 @@ def test_original_title_can_match():
     s = score(parse_filename("Amelie (2001).mkv"),
               cand("Le Fabuleux Destin d'Amélie Poulain", 2001, original="Amelie"))
     assert s.score >= 0.9
+
+
+# ---- found on a real library: sources agreeing, and near-miss neighbours
+
+def other(provider, title, year, kind="tv", pid="x"):
+    c = cand(title, year, kind=kind, pid=pid)
+    return Candidate(**{**c.__dict__, "provider": provider})
+
+
+def test_two_sources_agreeing_is_corroboration_not_a_tie():
+    p = parse_filename("Breaking Bad S01E01.mkv")
+    d = decide(p, [other("tvmaze", "Breaking Bad", 2008, pid="169"),
+                   other("wikidata", "Breaking Bad", 2008, pid="Q1079")])
+    assert d.status == "accept"
+    assert "agreed by 2 sources" in d.reason
+
+
+def test_exact_title_is_not_blocked_by_a_fuzzy_neighbour():
+    p = parse_filename("Breaking Bad S01E01.mkv")
+    d = decide(p, [other("tvmaze", "Breaking Bad", 2008, pid="169"),
+                   other("tvmaze", "Breaking Band", 2016, pid="2")])
+    assert d.status == "accept"
+    assert d.best.candidate.title == "Breaking Bad"
+
+
+def test_same_source_listing_the_same_title_twice_is_still_a_tie():
+    p = parse_filename("Home S01E01.mkv")
+    d = decide(p, [other("tvmaze", "Home", 2010, pid="1"), other("tvmaze", "Home", 2010, pid="2")])
+    assert d.status == "review" and "tie" in d.reason
+
+
+def test_two_exact_shows_with_different_years_and_no_year_in_name_is_a_tie():
+    p = parse_filename("Doctor Who S01E01.mkv")
+    d = decide(p, [other("tvmaze", "Doctor Who", 1963, pid="1"),
+                   other("tvmaze", "Doctor Who", 2005, pid="2")])
+    assert d.status == "review"
+
+
+def test_sources_that_disagree_on_year_are_not_merged():
+    p = parse_filename("Some Show S01E01.mkv")
+    d = decide(p, [other("tvmaze", "Some Show", 2008, pid="1"),
+                   other("wikidata", "Some Show", 2015, pid="Q2")])
+    assert d.status == "review"

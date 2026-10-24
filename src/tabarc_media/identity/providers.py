@@ -30,6 +30,18 @@ DEFAULT_ATTEMPTS = 3
 MIN_INTERVAL = {"wikidata": 1.0, "tvmaze": 1.0, "openlibrary": 1.0}
 
 
+MAX_RETRY_AFTER = 30.0
+
+
+def _retry_after(exc: urllib.error.HTTPError) -> float | None:
+    """Seconds the server asked us to wait, if it said so in plain seconds."""
+    raw = exc.headers.get("Retry-After") if exc.headers else None
+    try:
+        return min(max(float(raw), 0.0), MAX_RETRY_AFTER)
+    except (TypeError, ValueError):
+        return None  # absent, or an HTTP date we don't parse
+
+
 class ProviderError(RuntimeError):
     """A provider call failed. `transient` means a retry later may succeed."""
 
@@ -107,6 +119,7 @@ class Client:
         full = f"{url}?{urllib.parse.urlencode(params)}"
         delay = 1.0
         for attempt in range(1, self.attempts + 1):
+            asked = None
             self._limiters[provider].wait()
             req = urllib.request.Request(full, headers={
                 "User-Agent": self.user_agent,
@@ -118,6 +131,7 @@ class Client:
                 return json.loads(body.decode("utf-8"))
             except urllib.error.HTTPError as exc:
                 transient = exc.code == 429 or exc.code >= 500
+                asked = _retry_after(exc) if transient else None
                 err = ProviderError(provider, f"HTTP {exc.code}", transient)
             except (urllib.error.URLError, socket.timeout, TimeoutError) as exc:
                 err = ProviderError(provider, f"network error ({type(exc).__name__})", True)
@@ -125,7 +139,7 @@ class Client:
                 err = ProviderError(provider, "response was not valid JSON", False)
             if not err.transient or attempt == self.attempts:
                 raise err
-            self._sleep(delay)
+            self._sleep(asked if asked is not None else delay)
             delay *= 2
         raise AssertionError("unreachable")  # pragma: no cover
 

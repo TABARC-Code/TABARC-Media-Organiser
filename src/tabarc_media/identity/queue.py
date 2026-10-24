@@ -17,7 +17,7 @@ import sqlite3
 from datetime import date
 from typing import Iterable
 
-from tabarc_media.identity.parser import ParsedName, parse_filename
+from tabarc_media.identity.parser import ParsedName
 from tabarc_media.identity.providers import ProviderError
 from tabarc_media.identity.scoring import Decision, decide
 
@@ -42,21 +42,22 @@ def _candidate_dicts(decision: Decision) -> list[dict]:
     ]
 
 
-def identify(conn: sqlite3.Connection, *, root: str, rel_path: str, filename: str,
+def identify(conn: sqlite3.Connection, *, root: str, rel_path: str, parsed: ParsedName,
              providers: Iterable, expected_kinds: frozenset[str] | None = None,
              today: date | None = None) -> str:
     """Look a file up, score the result and record it. Returns the status written, or 'skipped'."""
-    parsed: ParsedName = parse_filename(filename)
     today = today or date.today()
     providers = list(providers)  # may be a one-shot iterable; we count it below
 
     candidates, failed = [], []
-    if parsed.title is not None and not parsed.needs_review:
+    if parsed.title is not None:
         for provider in providers:
             try:
                 candidates.extend(provider.search(parsed.title))
             except ProviderError as exc:
-                failed.append(f"{exc.provider}:{'transient' if exc.transient else 'permanent'}")
+                detail = str(exc).split(": ", 1)[-1]
+                kind = "transient" if exc.transient else "permanent"
+                failed.append(f"{exc.provider}:{kind}:{detail}")
 
         if providers and len(failed) == len(providers) and not candidates:
             return "skipped"  # every provider failed, so there is no verdict to record

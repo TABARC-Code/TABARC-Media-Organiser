@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -10,7 +11,10 @@ from pathlib import Path
 from tabarc_media import __version__
 from tabarc_media.catalogue.db import CatalogueError, ScanLock, connect
 from tabarc_media.catalogue.stats import collect, human_size
-from tabarc_media.config.loader import ConfigError, load_config, write_initial_config
+from tabarc_media.config.loader import ConfigError, KNOWN_PROVIDERS, load_config, write_initial_config
+from tabarc_media.identity.credits import CREDITS
+from tabarc_media.identity.queue import resolve
+from tabarc_media.identity.runner import run_identify
 from tabarc_media.inspection.inventory import ffprobe_available
 from tabarc_media.inspection.runner import ScanSummary, run_inventory
 
@@ -150,6 +154,123 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_identify(args: argparse.Namespace) -> int:
+    cfg = load_config(Path(args.config))
+    if cfg.providers.offline:
+        print("Offline mode is on in the config, so no lookups were made.")
+        return EXIT_OK
+    if not cfg.providers.contact:
+        raise ConfigError(
+            "Set contact under [providers] in the config before running lookups. "
+            "An email address is ideal. Free metadata services ask who is calling."
+        )
+    if not cfg.providers.enabled:
+        raise ConfigError("No providers are enabled under [providers] enabled.")
+
+    with ScanLock(cfg.database_path):
+        conn = connect(cfg.database_path)
+        try:
+            summary = run_identify(conn, cfg, limit=args.limit)
+        finally:
+            conn.close()
+
+    print(f"Identify: {summary.considered} looked up, {summary.fresh_skipped} reused from earlier.")
+    for status in ("matched", "pending", "none", "skipped", "no_provider"):
+        if summary.counts.get(status):
+            print(f"  {status:<12}{summary.counts[status]}")
+    for name, calls in summary.provider_calls.items():
+        print(f"  {name} calls: {calls}")
+    if summary.counts.get("pending"):
+        print("Run 'tabarc-media review' to look at the ones that need a person.")
+    if summary.providers_failed:
+        print("Some lookups failed. Nothing was recorded for files where every source failed.")
+        return EXIT_ISSUES
+    return EXIT_OK
+
+
+def _candidates(row) -> list[dict]:
+    return json.loads(row["candidates"])
+
+
+def cmd_review_list(args: argparse.Namespace) -> int:
+    cfg = load_config(Path(args.config))
+    conn = connect(cfg.database_path)
+    try:
+        rows = conn.execute(
+            "SELECT * FROM identity_matches WHERE status = ? ORDER BY root, rel_path LIMIT ?",
+            (args.status, args.limit),
+        ).fetchall()
+        if not rows:
+            print(f"Nothing with status '{args.status}'.")
+            return EXIT_OK
+        for r in rows:
+            print(f"#{r['id']}  {r['status']}  {r['rel_path']}")
+            print(f"    why: {r['reason']}")
+            if r["providers_failed"]:
+                print(f"    sources that failed: {r['providers_failed']}")
+            for n, c in enumerate(_candidates(r)[:3], 1):
+                year = f" ({c['year']})" if c["year"] else ""
+                print(f"    {n}. {c['score']:.2f}  {c['title']}{year}  {c['kind']}  "
+                      f"{c['provider']} {c['provider_id']}")
+        print(f"{len(rows)} shown. Accept with: review accept ID --candidate N")
+    finally:
+        conn.close()
+    return EXIT_OK
+
+
+def cmd_review_accept(args: argparse.Namespace) -> int:
+    cfg = load_config(Path(args.config))
+    conn = connect(cfg.database_path)
+    try:
+        row = conn.execute("SELECT * FROM identity_matches WHERE id = ?", (args.id,)).fetchone()
+        if row is None:
+            print(f"No entry #{args.id}.", file=sys.stderr)
+            return EXIT_CONFIG
+        cands = _candidates(row)
+        if not 1 <= args.candidate <= len(cands):
+            print(f"Entry #{args.id} has {len(cands)} candidate(s). Pick 1 to {len(cands)}.",
+                  file=sys.stderr)
+            return EXIT_CONFIG
+        chosen = cands[args.candidate - 1]
+        resolve(conn, args.id, "accept", chosen["provider"], chosen["provider_id"])
+        print(f"Accepted #{args.id}: {chosen['title']} ({chosen['provider']} "
+              f"{chosen['provider_id']}). No files were changed.")
+    finally:
+        conn.close()
+    return EXIT_OK
+
+
+def cmd_review_reject(args: argparse.Namespace) -> int:
+    cfg = load_config(Path(args.config))
+    conn = connect(cfg.database_path)
+    try:
+        row = conn.execute("SELECT id FROM identity_matches WHERE id = ?", (args.id,)).fetchone()
+        if row is None:
+            print(f"No entry #{args.id}.", file=sys.stderr)
+            return EXIT_CONFIG
+        resolve(conn, args.id, "reject")
+        print(f"Rejected #{args.id}. It won't be looked up again unless you clear it.")
+    finally:
+        conn.close()
+    return EXIT_OK
+
+
+def cmd_about(args: argparse.Namespace) -> int:
+    enabled = list(KNOWN_PROVIDERS)
+    try:
+        enabled = list(load_config(Path(args.config)).providers.enabled)
+    except ConfigError:
+        pass  # no usable config yet, so show every source we could use
+    print(f"TABARC Media Organiser {__version__}")
+    print("Author: TABARC-Code. MIT licence.")
+    print()
+    print("Data sources:")
+    for name in KNOWN_PROVIDERS:
+        marker = "enabled " if name in enabled else "disabled"
+        print(f"  [{marker}] {CREDITS[name]}")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tabarc-media", description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -177,6 +298,28 @@ def build_parser() -> argparse.ArgumentParser:
     iss = sub.add_parser("issues", help="List issues from a scan (default: latest)")
     iss.add_argument("--scan", type=int, help="Scan id")
     iss.set_defaults(func=cmd_issues)
+
+    ide = sub.add_parser("identify", help="Look files up in the enabled sources (read-only)")
+    ide.add_argument("--limit", type=int, help="Look up at most this many files this run")
+    ide.set_defaults(func=cmd_identify)
+
+    rev = sub.add_parser("review", help="Look at matches that need a person")
+    rev_sub = rev.add_subparsers(dest="review_command", required=True)
+    rl = rev_sub.add_parser("list", help="Show queued matches")
+    rl.add_argument("--status", default="pending",
+                    choices=["pending", "none", "matched", "accepted", "rejected"])
+    rl.add_argument("--limit", type=int, default=20)
+    rl.set_defaults(func=cmd_review_list)
+    ra = rev_sub.add_parser("accept", help="Accept one of the listed candidates")
+    ra.add_argument("id", type=int)
+    ra.add_argument("--candidate", type=int, required=True, help="Number from the list")
+    ra.set_defaults(func=cmd_review_accept)
+    rr = rev_sub.add_parser("reject", help="Reject a match")
+    rr.add_argument("id", type=int)
+    rr.set_defaults(func=cmd_review_reject)
+
+    abt = sub.add_parser("about", help="Version, licence and data source credits")
+    abt.set_defaults(func=cmd_about)
     return parser
 
 

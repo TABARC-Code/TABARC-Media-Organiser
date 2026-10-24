@@ -17,12 +17,12 @@ Right now it does one thing: it looks. It walks your library, records what's the
 
 ## Status
 
-Stage 1 of six. Read-only inventory only.
+Stage 2 of six. It looks and it asks, but it still changes nothing on disk.
 
 | Stage | What | State |
 |---|---|---|
 | 1 | Read-only inventory | Done |
-| 2 | Identity: TMDB, filename parsing, review queue | Next |
+| 2 | Identity: filename parsing, free sources, scoring, review queue | Built. Tried live on a small test library, not yet on a real NAS |
 | 3 | Dry-run plans, transaction journal, rollback | Planned |
 | 4 | NFO and reference files | Planned |
 | 5 | Ebooks, Calibre, Dewey (verified or blank) | Planned |
@@ -77,7 +77,7 @@ Things the loader will refuse, on purpose:
 - the database inside a library root
 - any key it doesn't recognise, so `media_extension` instead of `media_extensions` fails loudly instead of being quietly ignored
 
-**Keep the database on local disk.** SQLite over SMB or NFS is a known way to corrupt it. On Linux the tool checks the mount table and won't open a catalogue on cifs, nfs and friends. On other systems it can't check, so that one's on you.
+**Keep the database on local disk.** SQLite over SMB or NFS is a known way to corrupt it. The tool checks what the database path sits on (the mount table on Linux, `mount` on macOS, the drive type on Windows) and won't open a catalogue on a network share. If it can't tell, it warns instead of passing quietly.
 
 ## Run
 
@@ -87,11 +87,26 @@ tabarc-media inventory --no-probe   # quick first pass, no ffprobe
 tabarc-media stats                  # what the catalogue holds, per root, with total size
 tabarc-media issues                 # what went wrong in the last scan
 tabarc-media issues --scan 4        # ...or a specific one
+tabarc-media identify               # look files up in the free sources
+tabarc-media review                 # matches that need a person
+tabarc-media review accept 12 --candidate 1
+tabarc-media review reject 12
+tabarc-media about                  # version, licence and data source credits
 ```
+
+### Identifying files
+
+`identify` reads the catalogue, parses each video and book path (using the folders when the file name says too little, so `Some Film (2019)/movie.mkv` and `Show/Season 2/S02E05.mkv` both work), asks the enabled sources, scores what comes back and records it. It never touches a media file.
+
+A match is only marked `matched` when the title is strong, it clearly beats the runner-up, and nothing contradicts the file name. Two sources agreeing on the same work counts as one candidate, not a tie. Everything else goes to `pending` for you to look at, and a name with nothing to go on, like a bare `Dune.epub`, is searched but never accepted automatically. A file nothing close matches is `none`.
+
+Your accept or reject is never overwritten by a later run. Results are reused for `max_age_days` (30 by default) and then refreshed, except that a result built while a source was down is retried on the next run. Set `offline = true` to make no lookups at all.
+
+You must set `contact` under `[providers]` first, an email address is ideal. The free sources ask who is calling, and it goes in the User-Agent of every request. `identify` refuses to run without it.
 
 `stats` is the quick way to check the catalogue agrees with what you think is on the box. Sizes are in binary units (GiB, TiB), which is what most NAS dashboards show.
 
-Only one scan can run against a catalogue at a time. A second one is refused with a clear message. The lock belongs to the process, so a crash or `kill -9` can't leave it stuck, and a scan that died without finishing is marked `abandoned` next time round. (Locking needs Linux or macOS. On Windows it's skipped, so don't run two.)
+Only one scan can run against a catalogue at a time. A second one is refused with a clear message. The lock belongs to the process, so a crash or `kill -9` can't leave it stuck, and a scan that died without finishing is marked `abandoned` next time round. (Locking uses `flock` on Linux and macOS and `msvcrt` on Windows. On a platform with neither, the scan refuses to start.)
 
 The first full scan of a big NAS will take a while, mostly ffprobe. Later scans only probe files whose size or modified time changed, so they're much quicker. If you stop a scan with Ctrl-C, nothing's lost. Run it again and it picks up the expensive work where it left off.
 
@@ -101,7 +116,7 @@ The first full scan of a big NAS will take a while, mostly ffprobe. Later scans 
 |---|---|
 | 0 | Complete, no issues |
 | 2 | Config or catalogue problem, or another scan already running. Nothing scanned |
-| 3 | Complete, but some issues were recorded |
+| 3 | Complete, but some issues were recorded (for `identify`, a source failed) |
 | 130 | Interrupted |
 
 ## What it records, and what it won't do
@@ -123,12 +138,17 @@ It reports, rather than ignores:
 
 Files that vanish between scans are marked not present. They're never deleted from the catalogue. And if anything stopped a root being scanned completely, nothing in that root gets marked missing at all. An unmounted share looking like an empty library is exactly how a tool like this ruins someone's weekend.
 
-## Metadata providers (from Stage 2)
+## Metadata sources
 
-Bring your own keys. Every user needs their own account with each provider. Nothing is bundled, and keys never go in the repo, the logs or the catalogue.
+The default sources need no key and no account:
 
-- **TMDB.** Free key for non-commercial use. This product uses the TMDB API but is not endorsed or certified by TMDB.
-- **TheTVDB.** Opt-in. You'll need your own TheTVDB account and API key, and a subscription PIN if your key type requires one. Read their terms for your own use. Not my call to make for you.
+- **Wikidata** for films, TV and books. CC0.
+- **TVmaze** for TV. CC BY-SA 4.0, with credit to tvmaze.com. Anything you share that contains its data must carry the same licence.
+- **Open Library** for ebooks. Its data licence hasn't been confirmed by this project yet, so check it for your own use.
+
+`tabarc-media about` prints the credit lines for the sources you have enabled. IMDb's datasets are not used, since their terms rule out repackaging.
+
+Optional keyed sources (TMDB, TheTVDB) are planned but **not built yet**. When they arrive, each user will bring their own key and the tool will stay off those sources until it finds one. Nothing is bundled, and keys never go in the repo, the logs or the catalogue.
 
 ## Tests
 

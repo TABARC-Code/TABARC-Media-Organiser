@@ -41,3 +41,15 @@ sidecar_extensions = [
 # Run ffprobe on video files. Unchanged files are not probed twice.
 probe_video = true
 probe_timeout_seconds = 30
+
+[providers]
+# Free metadata sources that need no key. They ask who is calling, so put an
+# email address here. It is sent in the User-Agent so they can reach you if
+# your usage causes trouble. Lookups refuse to run while this is empty.
+contact = ""
+language = "en-gb"
+# Set true to make no lookups at all. Scans and reports still work.
+offline = false
+enabled = ["wikidata", "tvmaze", "openlibrary"]
+# A file's lookup is reused for this many days before it is refreshed.
+max_age_days = 30

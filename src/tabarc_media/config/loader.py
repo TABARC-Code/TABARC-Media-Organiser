@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 
@@ -52,7 +52,13 @@ _KNOWN_SECTIONS = {
         "exclude_dirs", "media_extensions", "sidecar_extensions",
         "probe_video", "probe_timeout_seconds",
     },
+    "providers": {"contact", "language", "offline", "enabled", "max_age_days"},
 }
+
+KNOWN_PROVIDERS = ("wikidata", "tvmaze", "openlibrary")
+DEFAULT_PROVIDERS_ENABLED = list(KNOWN_PROVIDERS)
+DEFAULT_PROVIDER_LANGUAGE = "en-gb"
+DEFAULT_MAX_AGE_DAYS = 30
 
 
 @dataclass(frozen=True)
@@ -65,10 +71,30 @@ class InventoryConfig:
 
 
 @dataclass(frozen=True)
+class ProvidersConfig:
+    contact: str              # sent in the User-Agent. Required before any lookup.
+    language: str
+    offline: bool
+    enabled: tuple[str, ...]
+    max_age_days: int
+
+
+def default_providers() -> ProvidersConfig:
+    return ProvidersConfig(
+        contact="",
+        language=DEFAULT_PROVIDER_LANGUAGE,
+        offline=False,
+        enabled=tuple(DEFAULT_PROVIDERS_ENABLED),
+        max_age_days=DEFAULT_MAX_AGE_DAYS,
+    )
+
+
+@dataclass(frozen=True)
 class Config:
     database_path: Path
     roots: tuple[Path, ...]
     inventory: InventoryConfig
+    providers: ProvidersConfig = field(default_factory=default_providers)
 
 
 def default_inventory() -> InventoryConfig:
@@ -142,6 +168,35 @@ def _check_keys(raw: dict) -> None:
         unknown = set(value) - _KNOWN_SECTIONS[section]
         if unknown:
             raise ConfigError(f"Unknown key(s) in [{section}]: {', '.join(sorted(unknown))}")
+
+
+def _build_providers(raw: dict) -> ProvidersConfig:
+    contact = raw.get("contact", "")
+    if not isinstance(contact, str):
+        raise ConfigError("providers.contact must be a string")
+    language = raw.get("language", DEFAULT_PROVIDER_LANGUAGE)
+    if not isinstance(language, str) or not language.strip():
+        raise ConfigError("providers.language must be a non-empty string such as 'en-gb'")
+    offline = raw.get("offline", False)
+    if not isinstance(offline, bool):
+        raise ConfigError("providers.offline must be true or false")
+    enabled = _str_list(raw.get("enabled", DEFAULT_PROVIDERS_ENABLED), "providers.enabled")
+    unknown = [e for e in enabled if e not in KNOWN_PROVIDERS]
+    if unknown:
+        raise ConfigError(
+            f"Unknown provider(s) in providers.enabled: {', '.join(unknown)}. "
+            f"Known: {', '.join(KNOWN_PROVIDERS)}"
+        )
+    age = raw.get("max_age_days", DEFAULT_MAX_AGE_DAYS)
+    if isinstance(age, bool) or not isinstance(age, int) or age < 0:
+        raise ConfigError("providers.max_age_days must be a whole number, 0 or more")
+    return ProvidersConfig(
+        contact=contact.strip(),
+        language=language.strip().lower(),
+        offline=offline,
+        enabled=tuple(dict.fromkeys(enabled)),
+        max_age_days=age,
+    )
 
 
 def _build_inventory(inv: dict) -> InventoryConfig:
@@ -227,4 +282,5 @@ def load_config(path: Path) -> Config:
         database_path=db_path,
         roots=roots,
         inventory=_build_inventory(raw.get("inventory", {})),
+        providers=_build_providers(raw.get("providers", {})),
     )

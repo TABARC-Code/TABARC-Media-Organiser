@@ -88,19 +88,58 @@ def decide(parsed: ParsedName, candidates: list[Candidate],
            expected_kinds: frozenset[str] | None = None) -> Decision:
     if parsed.title is None:
         return Decision("review", None, (), "filename gave no usable title")
-    if parsed.needs_review:
-        return Decision("review", None, (), "filename too thin to trust on its own")
 
     pool = [c for c in candidates if not expected_kinds or c.kind in expected_kinds]
     ranked = tuple(sorted((score(parsed, c) for c in pool),
                           key=lambda s: (-s.score, s.candidate.provider, s.candidate.provider_id)))
+    if parsed.needs_review:
+        # A thin name is still searched, so a person has something to choose from,
+        # but it can never be accepted automatically.
+        best = ranked[0] if ranked and ranked[0].score >= REVIEW_FLOOR else None
+        return Decision("review", best, ranked, "filename too thin to trust on its own")
     if not ranked or ranked[0].score < REVIEW_FLOOR:
         return Decision("none", None, ranked, "no candidate close enough")
 
-    top = ranked[0]
-    runner_up = ranked[1].score if len(ranked) > 1 else 0.0
+    groups = _group(ranked)
+    top = groups[0][0]
+    others = [g[0] for g in groups[1:]]
+    wanted = normalise(parsed.title)
+
+    def exact(s: Scored) -> bool:
+        names = [s.candidate.title] + ([s.candidate.original_title] if s.candidate.original_title else [])
+        return wanted in {normalise(n) for n in names}
+
+    # An exact title match is only challenged by other exact matches (a remake,
+    # a same-name show). A near-miss like "Breaking Band" is not a rival.
+    rivals = [o for o in others if exact(o)] if exact(top) else others
+    runner_up = max((o.score for o in rivals), default=0.0)
+    agreed = len(groups[0])
+
     if top.score >= ACCEPT_SCORE and top.score - runner_up >= ACCEPT_MARGIN:
-        return Decision("accept", top, ranked, "clear winner")
+        why = "clear winner" if agreed == 1 else f"clear winner, agreed by {agreed} sources"
+        return Decision("accept", top, ranked, why)
     if top.score >= ACCEPT_SCORE:
         return Decision("review", top, ranked, "tie or near-tie with another candidate")
     return Decision("review", top, ranked, "best match not strong enough to accept")
+
+
+def _group(ranked: tuple[Scored, ...]) -> list[list[Scored]]:
+    """Merge candidates that are the same work reported by different sources.
+
+    Same kind, same normalised title and same year from different providers is
+    one work seen twice, which is corroboration and not a tie. Two entries from
+    the same provider stay separate, because that really is ambiguous.
+    """
+    groups: list[list[Scored]] = []
+    for item in ranked:
+        c = item.candidate
+        for g in groups:
+            head = g[0].candidate
+            if (head.kind == c.kind and head.year == c.year
+                    and normalise(head.title) == normalise(c.title)
+                    and all(m.candidate.provider != c.provider for m in g)):
+                g.append(item)
+                break
+        else:
+            groups.append([item])
+    return groups

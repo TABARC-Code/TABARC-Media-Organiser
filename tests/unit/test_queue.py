@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from tabarc_media.catalogue import db
+from tabarc_media.identity.parser import parse_filename
 from tabarc_media.identity.providers import Candidate, ProviderError
 from tabarc_media.identity.queue import identify, resolve
 
@@ -40,7 +41,7 @@ def row(conn, rel):
 
 def test_strong_match_is_recorded_as_matched_with_provenance(conn):
     p = Fake("wikidata", [cand("Some Film", 2019)])
-    status = identify(conn, root="/r", rel_path="a.mkv", filename="Some Film (2019).mkv",
+    status = identify(conn, root="/r", rel_path="a.mkv", parsed=parse_filename("Some Film (2019).mkv"),
                       providers=[p], today=date(2026, 10, 24))
     assert status == "matched"
     r = row(conn, "a.mkv")
@@ -48,20 +49,22 @@ def test_strong_match_is_recorded_as_matched_with_provenance(conn):
     assert "CC0 1.0" in r["candidates"] and "retrieved_on" in r["candidates"]
 
 
-def test_weak_match_goes_to_pending_and_thin_name_never_calls_providers(conn):
+def test_weak_match_goes_to_pending_and_thin_name_is_searched_but_never_matched(conn):
     p = Fake("wikidata", [cand("Some Film", 1975)])
-    assert identify(conn, root="/r", rel_path="b.mkv", filename="Some Film (2019).mkv",
+    assert identify(conn, root="/r", rel_path="b.mkv", parsed=parse_filename("Some Film (2019).mkv"),
                     providers=[p]) == "pending"
     q = Fake("wikidata", [cand("Random", None)])
-    assert identify(conn, root="/r", rel_path="c.mkv", filename="Random.mkv",
+    assert identify(conn, root="/r", rel_path="c.mkv", parsed=parse_filename("Random.mkv"),
                     providers=[q]) == "pending"
-    assert q.calls == 0
+    # A thin name is searched so a person has candidates, but never auto-matched.
+    assert q.calls == 1
+    assert "Random" in row(conn, "c.mkv")["candidates"]
 
 
 def test_all_providers_failing_writes_nothing(conn):
     p = Fake("wikidata", error=True)
     q = Fake("tvmaze", error=False)
-    assert identify(conn, root="/r", rel_path="d.mkv", filename="Some Film (2019).mkv",
+    assert identify(conn, root="/r", rel_path="d.mkv", parsed=parse_filename("Some Film (2019).mkv"),
                     providers=[p, q]) == "skipped"
     assert row(conn, "d.mkv") is None
 
@@ -69,24 +72,24 @@ def test_all_providers_failing_writes_nothing(conn):
 def test_partial_failure_is_recorded_so_the_gap_is_visible(conn):
     ok = Fake("wikidata", [cand("Some Film", 2019)])
     bad = Fake("tvmaze", error=True)
-    identify(conn, root="/r", rel_path="e.mkv", filename="Some Film (2019).mkv",
+    identify(conn, root="/r", rel_path="e.mkv", parsed=parse_filename("Some Film (2019).mkv"),
              providers=[ok, bad])
-    assert row(conn, "e.mkv")["providers_failed"] == "tvmaze:transient"
+    assert row(conn, "e.mkv")["providers_failed"] == "tvmaze:transient:down"
 
 
 def test_human_decision_survives_a_rescan(conn):
-    identify(conn, root="/r", rel_path="f.mkv", filename="Some Film (2019).mkv",
+    identify(conn, root="/r", rel_path="f.mkv", parsed=parse_filename("Some Film (2019).mkv"),
              providers=[Fake("wikidata", [cand("Some Film", 1975)])])
     rid = row(conn, "f.mkv")["id"]
     resolve(conn, rid, "reject")
-    again = identify(conn, root="/r", rel_path="f.mkv", filename="Some Film (2019).mkv",
+    again = identify(conn, root="/r", rel_path="f.mkv", parsed=parse_filename("Some Film (2019).mkv"),
                      providers=[Fake("wikidata", [cand("Some Film", 2019)])])
     assert again == "kept"
     assert row(conn, "f.mkv")["status"] == "rejected"
 
 
 def test_accept_needs_the_provider_and_id(conn):
-    identify(conn, root="/r", rel_path="g.mkv", filename="Some Film (2019).mkv",
+    identify(conn, root="/r", rel_path="g.mkv", parsed=parse_filename("Some Film (2019).mkv"),
              providers=[Fake("wikidata", [cand("Some Film", 1975)])])
     rid = row(conn, "g.mkv")["id"]
     with pytest.raises(ValueError):

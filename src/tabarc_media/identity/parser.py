@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 
 # Anything in this list ends the title. Release tags, codecs and resolutions.
 _RELEASE_TAG = re.compile(
@@ -50,6 +51,47 @@ def _clean(text: str) -> str:
 def parse_filename(name: str) -> ParsedName:
     """Parse a filename (with or without its extension) into title, year and episode."""
     stem = name.rsplit(".", 1)[0] if "." in name and name.rsplit(".", 1)[1].isalnum() else name
+    return _parse_stem(stem)
+
+
+_SEASON_DIR = re.compile(r"(?i)^(?:season|series|s)[ ._-]?\d{1,2}$|^specials?$")
+
+
+def parse_path(rel_path: str) -> ParsedName:
+    """Parse a library-relative path, using the folders when the file name says too little.
+
+    `Some Film (2019)/movie.mkv` takes its title and year from the folder.
+    `Show Name/Season 2/S02E05.mkv` takes the show from the nearest folder
+    that isn't a season folder. A file name that already says enough wins.
+    """
+    parts = [p for p in re.split(r"[\\/]", rel_path) if p]
+    if not parts:
+        return _parse_stem("")
+    parsed = parse_filename(parts[-1])
+    folders = parts[:-1]
+
+    if parsed.unsupported:
+        return parsed
+
+    if parsed.title is None and parsed.is_episode:
+        for folder in reversed(folders):
+            if _SEASON_DIR.match(folder.strip()):
+                continue
+            fp = _parse_stem(folder)
+            if fp.title:
+                return ParsedName(fp.title, fp.year, parsed.season, parsed.episode,
+                                  unsupported=None, needs_review=False)
+            break
+        return parsed
+
+    if parsed.needs_review and not parsed.is_episode and folders:
+        fp = _parse_stem(folders[-1])
+        if fp.title and fp.year is not None and not fp.needs_review:
+            return fp
+    return parsed
+
+
+def _parse_stem(stem: str) -> ParsedName:
     stem = _BRACKETS.sub(" ", stem)
 
     if _MULTI_EPISODE.search(stem):
@@ -73,14 +115,22 @@ def parse_filename(name: str) -> ParsedName:
             cut = min(cut, m.start())
 
     year = None
+    latest = date.today().year + 1  # a release a year ahead is plausible, 2049 is a title
+    found = []
     for ym in _YEAR.finditer(stem):
         # A year at the very start is part of the title, e.g. "1917" or "2001 A Space Odyssey".
         if ym.start() == 0 or ym.start(1) == 0:
             continue
-        if ym.start(1) < cut:
-            year = int(ym.group(1))
-            cut = min(cut, ym.start())
-        break
+        if int(ym.group(1)) > latest or ym.start(1) >= cut:
+            continue
+        found.append(ym)
+    if found:
+        # "Blade Runner 2049 (2017)": the bracketed year is the release year.
+        # Otherwise the last one wins, since a year inside a title comes first.
+        bracketed = [m for m in found if stem[m.start(1) - 1] in "(["]
+        chosen = (bracketed or found)[-1]
+        year = int(chosen.group(1))
+        cut = min(cut, chosen.start())
 
     tag = _RELEASE_TAG.search(stem)
     if tag and tag.start() < cut:
